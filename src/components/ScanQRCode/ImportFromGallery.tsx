@@ -1,32 +1,45 @@
 "use client";
-import { useRef, useState } from 'react';
-import Image from 'next/image';
-import jsQR from 'jsqr';
-import ImportIcon from '@/assets/Import_From_Gallery.svg';
+
+import { useRef, useState } from "react";
+import Image from "next/image";
+import jsQR from "jsqr";
+import ImportIcon from "@/assets/Import_From_Gallery.svg";
+
 interface ImportFromGalleryProps {
   onImport: (result: string) => void;
   onError?: (error: string) => void;
+  disabled?: boolean;
 }
-export default function ImportFromGallery({ onImport, onError }: ImportFromGalleryProps) {
+
+export default function ImportFromGallery({
+  onImport,
+  onError,
+  disabled,
+}: ImportFromGalleryProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
   const handleClick = () => {
+    if (disabled || isProcessing) {
+      return;
+    }
     fileInputRef.current?.click();
   };
+
   const processImage = async (file: File): Promise<string | null> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
-      
+
       reader.onload = (e) => {
         const img = new window.Image();
         img.onload = () => {
           // Create canvas to process image
-          const canvas = document.createElement('canvas');
-          const ctx = canvas.getContext('2d');
-          
+          const canvas = document.createElement("canvas");
+          const ctx = canvas.getContext("2d");
+
           if (!ctx) {
-            reject('Cannot create canvas context');
+            reject("Cannot create canvas context");
             return;
           }
           canvas.width = img.width;
@@ -34,27 +47,28 @@ export default function ImportFromGallery({ onImport, onError }: ImportFromGalle
           ctx.drawImage(img, 0, 0);
           // Get image data for QR detection
           const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
-          
+
           // Decode QR code
           const code = jsQR(imageData.data, imageData.width, imageData.height);
-          
+
           if (code) {
             resolve(code.data);
           } else {
-            reject('QR Code tidak ditemukan dalam gambar');
+            reject("QR Code tidak ditemukan dalam gambar");
           }
         };
         img.onerror = () => {
-          reject('Gagal memuat gambar');
+          reject("Gagal memuat gambar");
         };
         img.src = e.target?.result as string;
       };
       reader.onerror = () => {
-        reject('Gagal membaca file');
+        reject("Gagal membaca file");
       };
       reader.readAsDataURL(file);
     });
   };
+
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -62,8 +76,8 @@ export default function ImportFromGallery({ onImport, onError }: ImportFromGalle
     setError(null);
     setIsProcessing(true);
     // Validate file type
-    if (!file.type.startsWith('image/')) {
-      const errorMsg = 'File harus berupa gambar (PNG, JPG, dll)';
+    if (!file.type.startsWith("image/")) {
+      const errorMsg = "File harus berupa gambar (PNG, JPG, dll)";
       setError(errorMsg);
       onError?.(errorMsg);
       setIsProcessing(false);
@@ -71,7 +85,7 @@ export default function ImportFromGallery({ onImport, onError }: ImportFromGalle
     }
     // Validate file size (max 10MB)
     if (file.size > 10 * 1024 * 1024) {
-      const errorMsg = 'Ukuran file terlalu besar (max 10MB)';
+      const errorMsg = "Ukuran file terlalu besar (max 10MB)";
       setError(errorMsg);
       onError?.(errorMsg);
       setIsProcessing(false);
@@ -84,17 +98,20 @@ export default function ImportFromGallery({ onImport, onError }: ImportFromGalle
         onImport(result);
       }
     } catch (err) {
-      const errorMsg = typeof err === 'string' ? err : 'Gagal memproses QR Code';
+      const errorMsg = typeof err === "string" ? err : "Gagal memproses QR Code";
       setError(errorMsg);
       onError?.(errorMsg);
     } finally {
       setIsProcessing(false);
       // Reset input so same file can be selected again
       if (fileInputRef.current) {
-        fileInputRef.current.value = '';
+        fileInputRef.current.value = "";
       }
     }
   };
+
+  const isDisabled = disabled || isProcessing;
+
   return (
     <div className="flex flex-col items-center gap-2">
       <input
@@ -106,20 +123,21 @@ export default function ImportFromGallery({ onImport, onError }: ImportFromGalle
       />
       <button
         onClick={handleClick}
-        disabled={isProcessing}
-        className={`flex items-center gap-3 px-6 py-3 border border-accent rounded-xl transition-colors
-          ${isProcessing ? 'opacity-50 cursor-not-allowed' : 'hover:bg-accent/10'}`}
+        disabled={isDisabled}
+        className={`flex items-center gap-3 px-6 py-3 border border-accent rounded-xl transition-colors ${
+          isDisabled ? "opacity-50 cursor-not-allowed" : "hover:bg-accent/10"
+        }`}
       >
         <Image src={ImportIcon} alt="Import" width={24} height={24} />
         <span className="text-white font-medium">
-          {isProcessing ? 'Processing...' : 'Import from gallery'}
+          {isProcessing ? "Processing..." : "Import from gallery"}
         </span>
       </button>
-      
+
       {/* Error Message */}
       {error && (
         <p className="text-red-500 text-sm mt-2 text-center max-w-xs">
-          ⚠️ {error}
+          {error}
         </p>
       )}
     </div>

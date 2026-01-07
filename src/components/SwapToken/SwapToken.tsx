@@ -35,33 +35,33 @@ export default function SwapToken() {
   const { smartAccountAddress, swapTokens, isLoading, isReady, status, error } =
     useSmartAccount();
 
+  const fetchBalance = useCallback(async () => {
+    if (!smartAccountAddress) {
+      setBalance("0");
+      return;
+    }
+
+    setIsLoadingBalance(true);
+    try {
+      const rawBalance = await publicClient.readContract({
+        address: fromCurrency.tokenAddress as Address,
+        abi: ERC20_ABI,
+        functionName: "balanceOf",
+        args: [smartAccountAddress],
+      });
+      setBalance(formatUnits(rawBalance as bigint, fromCurrency.decimals));
+    } catch (err) {
+      console.error("Failed to fetch balance:", err);
+      setBalance("0");
+    } finally {
+      setIsLoadingBalance(false);
+    }
+  }, [smartAccountAddress, fromCurrency]);
+
   // Fetch balance of fromCurrency
   useEffect(() => {
-    const fetchBalance = async () => {
-      if (!smartAccountAddress) {
-        setBalance("0");
-        return;
-      }
-
-      setIsLoadingBalance(true);
-      try {
-        const rawBalance = await publicClient.readContract({
-          address: fromCurrency.tokenAddress as Address,
-          abi: ERC20_ABI,
-          functionName: "balanceOf",
-          args: [smartAccountAddress],
-        });
-        setBalance(formatUnits(rawBalance as bigint, fromCurrency.decimals));
-      } catch (err) {
-        console.error("Failed to fetch balance:", err);
-        setBalance("0");
-      } finally {
-        setIsLoadingBalance(false);
-      }
-    };
-
     fetchBalance();
-  }, [smartAccountAddress, fromCurrency]);
+  }, [fetchBalance]);
 
   // Check if balance is sufficient
   const numAmount = parseFloat(amount) || 0;
@@ -138,8 +138,7 @@ export default function SwapToken() {
       });
 
       alert(`Swap successful! TX: ${txHash}`);
-      setAmount("");
-      setSwapQuote(null);
+      await fetchBalance();
     } catch (err) {
       console.error("Swap error:", err);
     }

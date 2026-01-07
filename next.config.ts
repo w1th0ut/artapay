@@ -6,7 +6,7 @@ const nextConfig: NextConfig = {
     root: __dirname,
   },
 
-  allowedDevOrigins: ["unwesternized-vonnie-nontangibly.ngrok-free.dev"],
+  allowedDevOrigins: ["e2f32fd1ea11.ngrok-free.app"],
 };
 
 export default nextConfig;

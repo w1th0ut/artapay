@@ -1,3 +1,6 @@
+import { TOKENS } from "@/config/constants";
+import { env } from "@/config/env";
+
 export interface Currency {
   id: string;
   name: string;
@@ -8,69 +11,87 @@ export interface Currency {
   decimals: number;
 }
 
-// Lisk Sepolia token addresses
+const tokenBySymbol = new Map(TOKENS.map((token) => [token.symbol, token]));
+
+const getToken = (symbol: string) => {
+  const token = tokenBySymbol.get(symbol);
+  if (!token) {
+    throw new Error(`Token ${symbol} is not configured`);
+  }
+  return token;
+};
+
+const chainId = env.chainId;
+const usdc = getToken("USDC");
+const usdt = getToken("USDT");
+const idrx = getToken("IDRX");
+const jpyc = getToken("JPYC");
+const eurc = getToken("EURC");
+const mxnt = getToken("MXNT");
+const cnht = getToken("CNHT");
+
 export const currencies: Currency[] = [
   {
     id: "usdc",
     name: "USD Coin",
     symbol: "USDC",
     icon: "/icons/usdc.svg",
-    chainId: 4202,
-    tokenAddress: "0x301D9ed91BACB39B798a460D133105BA729c6302",
-    decimals: 6,
+    chainId,
+    tokenAddress: usdc.address,
+    decimals: usdc.decimals,
   },
   {
     id: "usdt",
     name: "USD Tether",
     symbol: "USDT",
     icon: "/icons/usdt.svg",
-    chainId: 4202,
-    tokenAddress: "0x03F60361Aa488826e7DA7D7ADB2E1c6fC96D1B8B",
-    decimals: 6,
+    chainId,
+    tokenAddress: usdt.address,
+    decimals: usdt.decimals,
   },
   {
     id: "idrx",
     name: "IDRX",
     symbol: "IDRX",
     icon: "/icons/idrx.svg",
-    chainId: 4202,
-    tokenAddress: "0x18bEA3CDa9dE68E74ba9F33F1B2e11ad345112f0",
-    decimals: 6,
+    chainId,
+    tokenAddress: idrx.address,
+    decimals: idrx.decimals,
   },
   {
     id: "jpyc",
     name: "JPY Coin",
     symbol: "JPYC",
     icon: "/icons/jpyc.svg",
-    chainId: 4202,
-    tokenAddress: "0x97F9812a67b6cBA4F4D9b1013C5f4D708Ce9aA9e",
-    decimals: 8,
+    chainId,
+    tokenAddress: jpyc.address,
+    decimals: jpyc.decimals,
   },
   {
     id: "eurc",
     name: "Euro Coin",
     symbol: "EURC",
     icon: "/icons/eurc.svg",
-    chainId: 4202,
-    tokenAddress: "0xd10F51695bc3318759A75335EfE61E32727330b6",
-    decimals: 6,
+    chainId,
+    tokenAddress: eurc.address,
+    decimals: eurc.decimals,
   },
   {
     id: "mxnt",
     name: "Mexican Peso Tether",
     symbol: "MXNT",
     icon: "/icons/mxnt.svg",
-    chainId: 4202,
-    tokenAddress: "0x5e8B38DC8E00c2332AC253600975502CF9fbF36a",
-    decimals: 6,
+    chainId,
+    tokenAddress: mxnt.address,
+    decimals: mxnt.decimals,
   },
   {
     id: "cnht",
     name: "CNH Tether",
     symbol: "CNHT",
     icon: "/icons/cnht.svg",
-    chainId: 4202,
-    tokenAddress: "0xDFaE672AD0e094Ee64e370da99b1E37AB58AAc4f",
-    decimals: 6,
+    chainId,
+    tokenAddress: cnht.address,
+    decimals: cnht.decimals,
   },
 ];

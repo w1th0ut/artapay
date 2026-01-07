@@ -145,7 +145,7 @@ export default function TransactionPopup({
   const requiredAmount = quote
     ? Number(formatUnits(quote.totalRequired, payToken.decimals))
     : 0;
-  const hasInsufficientBalance = quote && requiredAmount > numBalance;
+  const hasInsufficientBalance = !!quote && requiredAmount > numBalance;
   const hasNoBalance = numBalance === 0;
 
   const handleSend = async () => {
