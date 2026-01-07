@@ -6,10 +6,17 @@ import { Loader2, AlertTriangle } from "lucide-react";
 import { useSmartAccount } from "@/hooks/useSmartAccount";
 import { currencies, Currency } from "@/components/Currency";
 import { CurrencyDropdown } from "@/components/Currency";
-import { PAYMENT_PROCESSOR_ADDRESS } from "@/config/constants";
+import {
+  PAYMENT_PROCESSOR_ADDRESS,
+  STABLE_SWAP_ADDRESS,
+} from "@/config/constants";
 import { createPublicClient, http, formatUnits } from "viem";
 import { LISK_SEPOLIA } from "@/config/chains";
-import { PAYMENT_PROCESSOR_ABI, ERC20_ABI } from "@/config/abi";
+import {
+  PAYMENT_PROCESSOR_ABI,
+  ERC20_ABI,
+  STABLE_SWAP_ABI,
+} from "@/config/abi";
 
 interface PaymentRequestPayload {
   version: string;
@@ -38,6 +45,13 @@ interface PaymentQuote {
   totalRequired: bigint;
 }
 
+interface SwapPaymentQuote {
+  amountIn: bigint;
+  amountOut: bigint;
+  fee: bigint;
+  totalUserPays: bigint;
+}
+
 export default function TransactionPopup({
   payload,
   onCancel,
@@ -48,9 +62,18 @@ export default function TransactionPopup({
   const [quoteError, setQuoteError] = useState<string | null>(null);
   const [balance, setBalance] = useState<string>("0");
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
+  const [swapQuote, setSwapQuote] = useState<SwapPaymentQuote | null>(null);
+  const [isLoadingSwapQuote, setIsLoadingSwapQuote] = useState(false);
 
-  const { smartAccountAddress, payInvoice, isLoading, isReady, status, error } =
-    useSmartAccount();
+  const {
+    smartAccountAddress,
+    payInvoice,
+    swapTokens,
+    isLoading,
+    isReady,
+    status,
+    error,
+  } = useSmartAccount();
 
   const publicClient = useMemo(
     () =>
@@ -65,6 +88,10 @@ export default function TransactionPopup({
     payload.processor && payload.processor !== "0x0"
       ? (payload.processor as `0x${string}`)
       : (PAYMENT_PROCESSOR_ADDRESS as `0x${string}`);
+
+  const isDifferentToken =
+    payToken.tokenAddress.toLowerCase() !==
+    payload.request.requestedToken.toLowerCase();
 
   // Find requested currency
   const requestedCurrency = currencies.find(
@@ -81,6 +108,10 @@ export default function TransactionPopup({
         )
       )
     : 0;
+
+  const requiredRequestedToken = quote
+    ? quote.baseAmount + quote.platformFee
+    : 0n;
 
   // Fetch payment quote when payToken changes
   useEffect(() => {
@@ -117,6 +148,79 @@ export default function TransactionPopup({
     fetchQuote();
   }, [payToken, payload, publicClient, processorAddress]);
 
+  useEffect(() => {
+    if (!quote || !isDifferentToken) {
+      setSwapQuote(null);
+      setIsLoadingSwapQuote(false);
+      return;
+    }
+
+    const fetchSwapQuote = async () => {
+      setIsLoadingSwapQuote(true);
+      try {
+        let amountIn = quote.totalRequired - quote.swapFee;
+        if (amountIn < 0n) amountIn = 0n;
+
+        const getQuote = async (amount: bigint) => {
+          const breakdown = (await publicClient.readContract({
+            address: STABLE_SWAP_ADDRESS,
+            abi: STABLE_SWAP_ABI,
+            functionName: "getSwapQuote",
+            args: [
+              payToken.tokenAddress as `0x${string}`,
+              payload.request.requestedToken as `0x${string}`,
+              amount,
+            ],
+          })) as any;
+
+          return {
+            amountOut: BigInt(breakdown.amountOut || breakdown[0] || 0),
+            fee: BigInt(breakdown.fee || breakdown[1] || 0),
+            totalUserPays: BigInt(breakdown.totalUserPays || breakdown[2] || 0),
+          };
+        };
+
+        let quoteResult = await getQuote(amountIn);
+
+        if (
+          requiredRequestedToken > 0n &&
+          quoteResult.amountOut < requiredRequestedToken &&
+          amountIn > 0n
+        ) {
+          const perUnitOut = quoteResult.amountOut / amountIn;
+          const deficit = requiredRequestedToken - quoteResult.amountOut;
+          const extraIn =
+            perUnitOut > 0n
+              ? (deficit + perUnitOut - 1n) / perUnitOut
+              : 1n;
+          amountIn = amountIn + (extraIn > 0n ? extraIn : 1n);
+          quoteResult = await getQuote(amountIn);
+        }
+
+        setSwapQuote({
+          amountIn,
+          amountOut: quoteResult.amountOut,
+          fee: quoteResult.fee,
+          totalUserPays: quoteResult.totalUserPays,
+        });
+      } catch (err) {
+        console.error("Swap quote error:", err);
+        setSwapQuote(null);
+      } finally {
+        setIsLoadingSwapQuote(false);
+      }
+    };
+
+    fetchSwapQuote();
+  }, [
+    quote,
+    isDifferentToken,
+    payToken,
+    payload,
+    publicClient,
+    requiredRequestedToken,
+  ]);
+
   // Fetch balance of payToken
   useEffect(() => {
     const fetchBalance = async () => {
@@ -147,8 +251,12 @@ export default function TransactionPopup({
 
   // Check if balance is sufficient
   const numBalance = parseFloat(balance) || 0;
+  const effectiveTotalRequired =
+    isDifferentToken && swapQuote
+      ? swapQuote.totalUserPays
+      : quote?.totalRequired || 0n;
   const requiredAmount = quote
-    ? Number(formatUnits(quote.totalRequired, payToken.decimals))
+    ? Number(formatUnits(effectiveTotalRequired, payToken.decimals))
     : 0;
   const hasInsufficientBalance = !!quote && requiredAmount > numBalance;
   const hasNoBalance = numBalance === 0;
@@ -158,18 +266,53 @@ export default function TransactionPopup({
 
     try {
       const slippageBps = 100; // 1% slippage buffer
+      const request = {
+        recipient: payload.request.recipient as `0x${string}`,
+        requestedToken: payload.request.requestedToken as `0x${string}`,
+        requestedAmount: BigInt(payload.request.requestedAmountRaw),
+        deadline: BigInt(payload.request.deadline),
+        nonce: payload.request.nonce as `0x${string}`,
+        merchantSigner: payload.request.merchantSigner as `0x${string}`,
+      };
+
+      if (isDifferentToken) {
+        if (!swapQuote) {
+          setQuoteError("Failed to prepare swap for payment");
+          return;
+        }
+
+        await swapTokens({
+          tokenIn: payToken.tokenAddress as `0x${string}`,
+          tokenOut: payload.request.requestedToken as `0x${string}`,
+          amount: formatUnits(swapQuote.amountIn, payToken.decimals),
+          tokenInDecimals: payToken.decimals,
+          stableSwapAddress: STABLE_SWAP_ADDRESS,
+          minAmountOut: requiredRequestedToken,
+          totalUserPays: swapQuote.totalUserPays,
+        });
+
+        const maxAmountToPay =
+          (requiredRequestedToken * BigInt(10000 + slippageBps)) / 10000n;
+
+        const txHash = await payInvoice({
+          request,
+          merchantSignature: payload.signature as `0x${string}`,
+          payToken: payload.request.requestedToken as `0x${string}`,
+          totalRequired: requiredRequestedToken,
+          maxAmountToPay,
+          paymentProcessorAddress: processorAddress,
+        });
+
+        alert(`Payment successful! TX: ${txHash}`);
+        onCancel();
+        return;
+      }
+
       const maxAmountToPay =
         (quote.totalRequired * BigInt(10000 + slippageBps)) / 10000n;
 
       const txHash = await payInvoice({
-        request: {
-          recipient: payload.request.recipient as `0x${string}`,
-          requestedToken: payload.request.requestedToken as `0x${string}`,
-          requestedAmount: BigInt(payload.request.requestedAmountRaw),
-          deadline: BigInt(payload.request.deadline),
-          nonce: payload.request.nonce as `0x${string}`,
-          merchantSigner: payload.request.merchantSigner as `0x${string}`,
-        },
+        request,
         merchantSignature: payload.signature as `0x${string}`,
         payToken: payToken.tokenAddress as `0x${string}`,
         totalRequired: quote.totalRequired,
@@ -260,7 +403,7 @@ export default function TransactionPopup({
           </div>
 
           {/* Quote Info */}
-          {isLoadingQuote ? (
+          {isLoadingQuote || (isDifferentToken && isLoadingSwapQuote) ? (
             <div className="flex items-center justify-center gap-2 text-zinc-400 py-2">
               <Loader2 className="w-4 h-4 animate-spin" />
               Calculating...
@@ -270,14 +413,19 @@ export default function TransactionPopup({
               <div className="flex justify-between text-sm">
                 <span className="text-zinc-400">Swap Fee</span>
                 <span className="text-zinc-300">
-                  {formatQuoteAmount(quote.swapFee)} {payToken.symbol}
+                  {formatQuoteAmount(
+                    isDifferentToken && swapQuote
+                      ? swapQuote.fee
+                      : quote.swapFee
+                  )}{" "}
+                  {payToken.symbol}
                 </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-zinc-400">You Pay</span>
                 <span>
                   <span className="text-primary font-bold">
-                    {formatQuoteAmount(quote.totalRequired)}
+                    {formatQuoteAmount(effectiveTotalRequired)}
                   </span>
                   <span className="text-white ml-1">{payToken.symbol}</span>
                 </span>
@@ -340,6 +488,7 @@ export default function TransactionPopup({
               !quote ||
               isLoading ||
               isLoadingQuote ||
+              (isDifferentToken && (isLoadingSwapQuote || !swapQuote)) ||
               hasInsufficientBalance
             }
             className="w-full py-4 bg-primary text-black font-bold text-xl rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
