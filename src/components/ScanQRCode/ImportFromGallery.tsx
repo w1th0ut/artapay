@@ -1,29 +1,102 @@
 "use client";
-
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import Image from 'next/image';
+import jsQR from 'jsqr';
 import ImportIcon from '@/assets/Import_From_Gallery.svg';
-
 interface ImportFromGalleryProps {
-  onImport: (file: File) => void;
+  onImport: (result: string) => void;
+  onError?: (error: string) => void;
 }
-
-export default function ImportFromGallery({ onImport }: ImportFromGalleryProps) {
+export default function ImportFromGallery({ onImport, onError }: ImportFromGalleryProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
-
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const handleClick = () => {
     fileInputRef.current?.click();
   };
-
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const processImage = async (file: File): Promise<string | null> => {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      
+      reader.onload = (e) => {
+        const img = new window.Image();
+        img.onload = () => {
+          // Create canvas to process image
+          const canvas = document.createElement('canvas');
+          const ctx = canvas.getContext('2d');
+          
+          if (!ctx) {
+            reject('Cannot create canvas context');
+            return;
+          }
+          canvas.width = img.width;
+          canvas.height = img.height;
+          ctx.drawImage(img, 0, 0);
+          // Get image data for QR detection
+          const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+          
+          // Decode QR code
+          const code = jsQR(imageData.data, imageData.width, imageData.height);
+          
+          if (code) {
+            resolve(code.data);
+          } else {
+            reject('QR Code tidak ditemukan dalam gambar');
+          }
+        };
+        img.onerror = () => {
+          reject('Gagal memuat gambar');
+        };
+        img.src = e.target?.result as string;
+      };
+      reader.onerror = () => {
+        reject('Gagal membaca file');
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      onImport(file);
+    if (!file) return;
+    // Reset state
+    setError(null);
+    setIsProcessing(true);
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      const errorMsg = 'File harus berupa gambar (PNG, JPG, dll)';
+      setError(errorMsg);
+      onError?.(errorMsg);
+      setIsProcessing(false);
+      return;
+    }
+    // Validate file size (max 10MB)
+    if (file.size > 10 * 1024 * 1024) {
+      const errorMsg = 'Ukuran file terlalu besar (max 10MB)';
+      setError(errorMsg);
+      onError?.(errorMsg);
+      setIsProcessing(false);
+      return;
+    }
+    try {
+      const result = await processImage(file);
+      if (result) {
+        setError(null);
+        onImport(result);
+      }
+    } catch (err) {
+      const errorMsg = typeof err === 'string' ? err : 'Gagal memproses QR Code';
+      setError(errorMsg);
+      onError?.(errorMsg);
+    } finally {
+      setIsProcessing(false);
+      // Reset input so same file can be selected again
+      if (fileInputRef.current) {
+        fileInputRef.current.value = '';
+      }
     }
   };
-  
   return (
-    <>
+    <div className="flex flex-col items-center gap-2">
       <input
         ref={fileInputRef}
         type="file"
@@ -33,11 +106,22 @@ export default function ImportFromGallery({ onImport }: ImportFromGalleryProps) 
       />
       <button
         onClick={handleClick}
-        className="flex items-center gap-3 px-6 py-3 border border-accent rounded-xl hover:bg-accent/10 transition-colors"
+        disabled={isProcessing}
+        className={`flex items-center gap-3 px-6 py-3 border border-accent rounded-xl transition-colors
+          ${isProcessing ? 'opacity-50 cursor-not-allowed' : 'hover:bg-accent/10'}`}
       >
         <Image src={ImportIcon} alt="Import" width={24} height={24} />
-        <span className="text-white font-medium">Import from gallery</span>
+        <span className="text-white font-medium">
+          {isProcessing ? 'Processing...' : 'Import from gallery'}
+        </span>
       </button>
-    </>
+      
+      {/* Error Message */}
+      {error && (
+        <p className="text-red-500 text-sm mt-2 text-center max-w-xs">
+          ⚠️ {error}
+        </p>
+      )}
+    </div>
   );
 }
