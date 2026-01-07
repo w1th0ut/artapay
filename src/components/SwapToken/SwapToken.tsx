@@ -12,6 +12,7 @@ import { parseUnits, formatUnits, type Address } from "viem";
 import { LISK_SEPOLIA } from "@/config/chains";
 import { createPublicClient, http } from "viem";
 import { ERC20_ABI } from "@/config/abi";
+import { ReceiptPopUp, ReceiptData } from "@/components/ReceiptPopUp";
 
 const publicClient = createPublicClient({
   chain: LISK_SEPOLIA,
@@ -27,6 +28,10 @@ export default function SwapToken() {
   const [quoteError, setQuoteError] = useState<string | null>(null);
   const [balance, setBalance] = useState<string>("0");
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
+
+  // Receipt states
+  const [receipt, setReceipt] = useState<ReceiptData | null>(null);
+  const [showReceipt, setShowReceipt] = useState(false);
 
   // Modal states
   const [showFromModal, setShowFromModal] = useState(false);
@@ -137,10 +142,39 @@ export default function SwapToken() {
         totalUserPays: BigInt(swapQuote.totalUserPays),
       });
 
-      alert(`Swap successful! TX: ${txHash}`);
+      // Create receipt for successful swap
+      const receiptData: ReceiptData = {
+        id: txHash,
+        type: "swap",
+        status: "success",
+        timestamp: new Date(),
+        amount: parseFloat(amount),
+        currency: fromCurrency.symbol,
+        currencyIcon: fromCurrency.icon,
+        swapToAmount: Number(formatUnits(amountOut, toCurrency.decimals)),
+        swapToCurrency: toCurrency.symbol,
+        swapToCurrencyIcon: toCurrency.icon,
+        txHash: txHash,
+      };
+
+      setReceipt(receiptData);
+      setShowReceipt(true);
       await fetchBalance();
     } catch (err) {
       console.error("Swap error:", err);
+      // Create failed receipt
+      const receiptData: ReceiptData = {
+        id: Date.now().toString(),
+        type: 'swap',
+        status: 'failed',
+        timestamp: new Date(),
+        amount: parseFloat(amount),
+        currency: fromCurrency.symbol,
+        currencyIcon: fromCurrency.icon,
+        errorMessage: err instanceof Error ? err.message : 'Swap failed',
+      };
+      setReceipt(receiptData);
+      setShowReceipt(true);
     }
   };
 
@@ -289,8 +323,8 @@ export default function SwapToken() {
           {isLoadingBalance
             ? "..."
             : numBalance.toLocaleString(undefined, {
-                maximumFractionDigits: 4,
-              })}{" "}
+              maximumFractionDigits: 4,
+            })}{" "}
           {fromCurrency.symbol}
         </div>
       )}
@@ -305,8 +339,8 @@ export default function SwapToken() {
           {isLoading
             ? "PROCESSING..."
             : hasInsufficientBalance
-            ? "INSUFFICIENT BALANCE"
-            : "SWAP NOW"}
+              ? "INSUFFICIENT BALANCE"
+              : "SWAP NOW"}
         </button>
       )}
 
@@ -322,6 +356,12 @@ export default function SwapToken() {
         onClose={() => setShowToModal(false)}
         onSelect={setToCurrency}
         excludeCurrency={fromCurrency}
+      />
+
+      <ReceiptPopUp
+        isOpen={showReceipt}
+        data={receipt}
+        onClose={() => setShowReceipt(false)}
       />
     </div>
   );

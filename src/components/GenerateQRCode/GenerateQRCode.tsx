@@ -9,6 +9,7 @@ import { useSmartAccount } from "@/hooks/useSmartAccount";
 import { PAYMENT_PROCESSOR_ADDRESS } from "@/config/constants";
 import { LISK_SEPOLIA } from "@/config/chains";
 import { parseUnits, keccak256, encodeAbiParameters, toHex } from "viem";
+import { ReceiptPopUp, ReceiptData } from "@/components/ReceiptPopUp";
 
 interface PaymentRequestPayload {
   version: "artapay-payment-v2";
@@ -32,6 +33,10 @@ export default function GenerateQRCode() {
     useState<PaymentRequestPayload | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Receipt states
+  const [receipt, setReceipt] = useState<ReceiptData | null>(null);
+  const [showReceipt, setShowReceipt] = useState(false);
 
   const {
     smartAccountAddress,
@@ -139,8 +144,23 @@ export default function GenerateQRCode() {
     setError(null);
   };
 
+  const handleReceiptClose = () => {
+    setShowReceipt(false);
+    setReceipt(null);
+    setAmount(0);
+  };
+
   if (generatedPayload) {
-    return <GeneratedQRCode data={generatedPayload} onBack={handleBack} />;
+    return (
+      <>
+        <GeneratedQRCode data={generatedPayload} onBack={handleBack} />
+        <ReceiptPopUp
+          isOpen={showReceipt}
+          data={receipt}
+          onClose={handleReceiptClose}
+        />
+      </>
+    );
   }
 
   return (
@@ -155,7 +175,6 @@ export default function GenerateQRCode() {
       <ClosedQRCode />
 
       <form onSubmit={handleGenerate} className="w-full max-w-sm space-y-6">
-        {/* Receive As (Currency Dropdown) */}
         <div className="space-y-2">
           <label className="text-white font-medium">Receive as</label>
           <CurrencyDropdown value={currency} onChange={setCurrency} />
@@ -199,6 +218,12 @@ export default function GenerateQRCode() {
           {isGenerating ? "GENERATING..." : "GENERATE QR"}
         </button>
       </form>
+
+      <ReceiptPopUp
+        isOpen={showReceipt}
+        data={receipt}
+        onClose={handleReceiptClose}
+      />
     </div>
   );
 }

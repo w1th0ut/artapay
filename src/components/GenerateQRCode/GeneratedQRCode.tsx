@@ -41,11 +41,17 @@ export default function GeneratedQRCode({
 
   const displayAmount = currency
     ? Number(
-        formatUnits(BigInt(data.request.requestedAmountRaw), currency.decimals)
-      ).toLocaleString(undefined, { maximumFractionDigits: 6 })
+      formatUnits(BigInt(data.request.requestedAmountRaw), currency.decimals)
+    ).toLocaleString(undefined, { maximumFractionDigits: 6 })
     : data.request.requestedAmountRaw;
 
   const symbol = currency?.symbol || "Token";
+
+  // Calculate remaining time until deadline
+  const deadlineDate = new Date(data.request.deadline * 1000);
+  const now = new Date();
+  const remainingMs = deadlineDate.getTime() - now.getTime();
+  const remainingMinutes = Math.max(0, Math.floor(remainingMs / 60000));
 
   const handleDownload = () => {
     if (!qrRef.current) return;
@@ -99,7 +105,9 @@ export default function GeneratedQRCode({
         <p className="text-primary text-2xl font-bold">
           {displayAmount} {symbol}
         </p>
-        <p className="text-zinc-400 text-sm mt-2">Expires in 5 minutes</p>
+        <p className="text-zinc-400 text-sm mt-2">
+          Expires in {remainingMinutes} minutes
+        </p>
       </div>
 
       <div className="flex gap-3 w-full max-w-sm">
@@ -114,9 +122,9 @@ export default function GeneratedQRCode({
 
       <button
         onClick={onBack}
-        className="w-full max-w-sm py-4 border-2 border-accent text-accent font-bold text-xl rounded-xl hover:bg-accent/10 transition-colors"
+        className="w-full max-w-sm py-4 bg-zinc-700 text-accent font-bold text-xl rounded-xl hover:bg-zinc-600 transition-colors"
       >
-        BACK
+        CANCEL
       </button>
     </div>
   );

@@ -6,6 +6,7 @@ import ImportFromGallery from "./ImportFromGallery";
 import TransactionPopup from "./TransactionPopup";
 import { PAYMENT_PROCESSOR_ADDRESS } from "@/config/constants";
 import { LISK_SEPOLIA } from "@/config/chains";
+import { ReceiptPopUp, ReceiptData } from "@/components/ReceiptPopUp";
 
 interface PaymentRequestPayload {
   version: string;
@@ -32,6 +33,8 @@ export default function QRCode({ onScanResult, disabled }: QRCodeProps) {
   const [scannedPayload, setScannedPayload] =
     useState<PaymentRequestPayload | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
+  const [receipt, setReceipt] = useState<ReceiptData | null>(null);
+  const [showReceipt, setShowReceipt] = useState(false);
 
   const handleScanNow = () => {
     if (disabled) {
@@ -155,6 +158,11 @@ export default function QRCode({ onScanResult, disabled }: QRCodeProps) {
           )}
         </>
       )}
+      <ReceiptPopUp
+        isOpen={showReceipt}
+        data={receipt}
+        onClose={() => setShowReceipt(false)}
+      />
     </div>
   );
 }

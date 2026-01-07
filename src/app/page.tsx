@@ -1,4 +1,4 @@
-"use client";
+"use client"
 import { useState, useCallback, useMemo, useEffect } from "react";
 import {
   Menu,
@@ -15,8 +15,7 @@ const contentComponents = {
   receive: ReceiveContent,
   swap: SwapContent,
   activity: ActivityContent,
-};
-
+}
 const STORAGE_KEY = "artapay_active_menu";
 
 export default function Home() {
@@ -50,7 +49,7 @@ export default function Home() {
     return (
       <div className="min-h-screen bg-zinc-900 p-8">
         <div className="max-w-2xl mx-auto space-y-8">
-          {/* Skeleton atau kosong */}
+          {/* Skeleton */}
         </div>
       </div>
     );
