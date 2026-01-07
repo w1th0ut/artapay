@@ -61,6 +61,11 @@ export default function TransactionPopup({
     []
   );
 
+  const processorAddress =
+    payload.processor && payload.processor !== "0x0"
+      ? (payload.processor as `0x${string}`)
+      : (PAYMENT_PROCESSOR_ADDRESS as `0x${string}`);
+
   // Find requested currency
   const requestedCurrency = currencies.find(
     (c) =>
@@ -85,7 +90,7 @@ export default function TransactionPopup({
 
       try {
         const breakdown = (await publicClient.readContract({
-          address: PAYMENT_PROCESSOR_ADDRESS,
+          address: processorAddress,
           abi: PAYMENT_PROCESSOR_ABI,
           functionName: "calculatePaymentCost",
           args: [
@@ -110,7 +115,7 @@ export default function TransactionPopup({
     };
 
     fetchQuote();
-  }, [payToken, payload, publicClient]);
+  }, [payToken, payload, publicClient, processorAddress]);
 
   // Fetch balance of payToken
   useEffect(() => {
@@ -169,7 +174,7 @@ export default function TransactionPopup({
         payToken: payToken.tokenAddress as `0x${string}`,
         totalRequired: quote.totalRequired,
         maxAmountToPay,
-        paymentProcessorAddress: PAYMENT_PROCESSOR_ADDRESS,
+        paymentProcessorAddress: processorAddress,
       });
 
       alert(`Payment successful! TX: ${txHash}`);
