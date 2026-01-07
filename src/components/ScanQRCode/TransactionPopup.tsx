@@ -6,10 +6,10 @@ import { Loader2, AlertTriangle } from "lucide-react";
 import { useSmartAccount } from "@/hooks/useSmartAccount";
 import { currencies, Currency } from "@/components/Currency";
 import { CurrencyDropdown } from "@/components/Currency";
-import { PAYMENT_PROCESSOR_ADDRESS, PAYMASTER_ADDRESS } from "@/config/constants";
-import { createPublicClient, http, formatUnits, parseUnits } from "viem";
+import { PAYMENT_PROCESSOR_ADDRESS } from "@/config/constants";
+import { createPublicClient, http, formatUnits } from "viem";
 import { LISK_SEPOLIA } from "@/config/chains";
-import { PAYMENT_PROCESSOR_ABI, ERC20_ABI, PAYMASTER_ABI } from "@/config/abi";
+import { PAYMENT_PROCESSOR_ABI, ERC20_ABI } from "@/config/abi";
 
 interface PaymentRequestPayload {
   version: string;
@@ -38,21 +38,6 @@ interface PaymentQuote {
   totalRequired: bigint;
 }
 
-const PAYMENT_USER_OP_GAS_LIMITS = {
-  callGasLimit: 1_300_000n,
-  verificationGasLimit: 950_000n,
-  paymasterVerificationGasLimit: 260_000n,
-  paymasterPostOpGasLimit: 260_000n,
-  preVerificationGas: 100_000n,
-};
-
-const TOTAL_USER_OP_GAS_LIMIT =
-  PAYMENT_USER_OP_GAS_LIMITS.callGasLimit +
-  PAYMENT_USER_OP_GAS_LIMITS.verificationGasLimit +
-  PAYMENT_USER_OP_GAS_LIMITS.paymasterVerificationGasLimit +
-  PAYMENT_USER_OP_GAS_LIMITS.paymasterPostOpGasLimit +
-  PAYMENT_USER_OP_GAS_LIMITS.preVerificationGas;
-
 export default function TransactionPopup({
   payload,
   onCancel,
@@ -63,11 +48,6 @@ export default function TransactionPopup({
   const [quoteError, setQuoteError] = useState<string | null>(null);
   const [balance, setBalance] = useState<string>("0");
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
-  const [paymasterFee, setPaymasterFee] = useState<bigint | null>(null);
-  const [isLoadingPaymasterFee, setIsLoadingPaymasterFee] = useState(false);
-  const [paymasterFeeError, setPaymasterFeeError] = useState<string | null>(
-    null
-  );
 
   const { smartAccountAddress, payInvoice, isLoading, isReady, status, error } =
     useSmartAccount();
@@ -132,57 +112,6 @@ export default function TransactionPopup({
     fetchQuote();
   }, [payToken, payload, publicClient]);
 
-  // Fetch paymaster fee estimate (gas fee in payToken)
-  useEffect(() => {
-    const addBuffer = (value: bigint) => {
-      const bumped = (value * 12n) / 10n; // +20%
-      return bumped > value ? bumped : value + 1n;
-    };
-
-    const fetchPaymasterFee = async () => {
-      if (!quote) {
-        setPaymasterFee(null);
-        setPaymasterFeeError(null);
-        return;
-      }
-
-      setIsLoadingPaymasterFee(true);
-      setPaymasterFeeError(null);
-
-      try {
-        let maxFeePerGas: bigint;
-        try {
-          const fees = await publicClient.estimateFeesPerGas();
-          maxFeePerGas = addBuffer(fees.maxFeePerGas);
-        } catch {
-          const gasPrice = await publicClient.getGasPrice();
-          maxFeePerGas = addBuffer(gasPrice);
-        }
-
-        const estimatedFee = await publicClient.readContract({
-          address: PAYMASTER_ADDRESS,
-          abi: PAYMASTER_ABI,
-          functionName: "estimateTotalCost",
-          args: [
-            payToken.tokenAddress as `0x${string}`,
-            TOTAL_USER_OP_GAS_LIMIT,
-            maxFeePerGas,
-          ],
-        });
-
-        setPaymasterFee(estimatedFee as bigint);
-      } catch (err) {
-        console.error("Paymaster fee estimate error:", err);
-        setPaymasterFee(null);
-        setPaymasterFeeError("Failed to estimate gas fee");
-      } finally {
-        setIsLoadingPaymasterFee(false);
-      }
-    };
-
-    fetchPaymasterFee();
-  }, [quote, payToken, publicClient]);
-
   // Fetch balance of payToken
   useEffect(() => {
     const fetchBalance = async () => {
@@ -213,20 +142,11 @@ export default function TransactionPopup({
 
   // Check if balance is sufficient
   const numBalance = parseFloat(balance) || 0;
-  const balanceRaw = useMemo(() => {
-    try {
-      return parseUnits(balance || "0", payToken.decimals);
-    } catch {
-      return 0n;
-    }
-  }, [balance, payToken.decimals]);
-  const totalRequired = quote ? quote.totalRequired : 0n;
-  const totalRequiredWithGas = quote
-    ? totalRequired + (paymasterFee ?? 0n)
-    : 0n;
-  const hasInsufficientBalance =
-    !!quote && balanceRaw < totalRequiredWithGas;
-  const hasNoBalance = balanceRaw === 0n;
+  const requiredAmount = quote
+    ? Number(formatUnits(quote.totalRequired, payToken.decimals))
+    : 0;
+  const hasInsufficientBalance = !!quote && requiredAmount > numBalance;
+  const hasNoBalance = numBalance === 0;
 
   const handleSend = async () => {
     if (!quote || !smartAccountAddress) return;
@@ -357,33 +277,6 @@ export default function TransactionPopup({
                   <span className="text-white ml-1">{payToken.symbol}</span>
                 </span>
               </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-zinc-400">Gas Fee (est.)</span>
-                <span className="text-zinc-300">
-                  {isLoadingPaymasterFee
-                    ? "..."
-                    : paymasterFee
-                    ? formatQuoteAmount(paymasterFee)
-                    : "N/A"}{" "}
-                  {payToken.symbol}
-                </span>
-              </div>
-              {paymasterFee && (
-                <div className="flex justify-between">
-                  <span className="text-zinc-400">Total (incl. gas)</span>
-                  <span>
-                    <span className="text-primary font-bold">
-                      {formatQuoteAmount(totalRequiredWithGas)}
-                    </span>
-                    <span className="text-white ml-1">{payToken.symbol}</span>
-                  </span>
-                </div>
-              )}
-              {paymasterFeeError && (
-                <div className="text-xs text-orange-400">
-                  {paymasterFeeError}. Payment may fail if balance is tight.
-                </div>
-              )}
             </div>
           ) : quoteError ? (
             <div className="p-3 bg-red-500/20 border border-red-500 rounded-lg text-red-400 text-sm text-center">
@@ -412,9 +305,7 @@ export default function TransactionPopup({
           <div className="mt-4 flex items-center gap-2 p-3 bg-orange-500/20 border border-orange-500 rounded-lg text-orange-400 text-sm">
             <AlertTriangle className="w-4 h-4 shrink-0" />
             <span>
-              Insufficient {payToken.symbol} balance. Need{" "}
-              {formatQuoteAmount(totalRequiredWithGas)} {payToken.symbol} (incl.
-              gas). You have{" "}
+              Insufficient {payToken.symbol} balance. You have{" "}
               {numBalance.toLocaleString(undefined, {
                 maximumFractionDigits: 4,
               })}{" "}
@@ -444,7 +335,6 @@ export default function TransactionPopup({
               !quote ||
               isLoading ||
               isLoadingQuote ||
-              isLoadingPaymasterFee ||
               hasInsufficientBalance
             }
             className="w-full py-4 bg-primary text-black font-bold text-xl rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
