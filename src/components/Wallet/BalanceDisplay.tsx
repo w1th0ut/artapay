@@ -1,0 +1,210 @@
+"use client";
+
+import { useState, useEffect } from "react";
+import Image from "next/image";
+import { Eye, EyeOff, ChevronDown, Loader2 } from "lucide-react";
+import { useSmartAccount } from "@/hooks/useSmartAccount";
+import { TOKENS } from "@/config/constants";
+import { LISK_SEPOLIA } from "@/config/chains";
+import { createPublicClient, http, formatUnits, type Address } from "viem";
+import { ERC20_ABI } from "@/config/abi";
+
+const publicClient = createPublicClient({
+  chain: LISK_SEPOLIA,
+  transport: http(LISK_SEPOLIA.rpcUrls.default.http[0]),
+});
+
+type TokenBalances = { [symbol: string]: string };
+
+export default function BalanceDisplay() {
+  const { smartAccountAddress } = useSmartAccount();
+  const [selectedTokenIndex, setSelectedTokenIndex] = useState(0);
+  const [balances, setBalances] = useState<TokenBalances>({});
+  const [isHidden, setIsHidden] = useState(false);
+  const [showDropdown, setShowDropdown] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isLoadingAll, setIsLoadingAll] = useState(false);
+
+  const selectedToken = TOKENS[selectedTokenIndex];
+
+  // Fetch all balances when address changes or dropdown opens
+  const fetchAllBalances = async () => {
+    if (!smartAccountAddress) return;
+
+    setIsLoadingAll(true);
+    const newBalances: TokenBalances = {};
+
+    try {
+      await Promise.all(
+        TOKENS.map(async (token) => {
+          try {
+            const rawBalance = await publicClient.readContract({
+              address: token.address as Address,
+              abi: ERC20_ABI,
+              functionName: "balanceOf",
+              args: [smartAccountAddress],
+            });
+            newBalances[token.symbol] = formatUnits(
+              rawBalance as bigint,
+              token.decimals
+            );
+          } catch {
+            newBalances[token.symbol] = "0";
+          }
+        })
+      );
+      setBalances(newBalances);
+    } finally {
+      setIsLoadingAll(false);
+    }
+  };
+
+  // Fetch selected token balance on mount and when token changes
+  useEffect(() => {
+    const fetchBalance = async () => {
+      if (!smartAccountAddress) {
+        setBalances({});
+        return;
+      }
+
+      setIsLoading(true);
+      try {
+        const rawBalance = await publicClient.readContract({
+          address: selectedToken.address as Address,
+          abi: ERC20_ABI,
+          functionName: "balanceOf",
+          args: [smartAccountAddress],
+        });
+
+        const formatted = formatUnits(
+          rawBalance as bigint,
+          selectedToken.decimals
+        );
+        setBalances((prev) => ({ ...prev, [selectedToken.symbol]: formatted }));
+      } catch (err) {
+        console.error("Failed to fetch balance:", err);
+        setBalances((prev) => ({ ...prev, [selectedToken.symbol]: "0" }));
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    fetchBalance();
+  }, [smartAccountAddress, selectedToken]);
+
+  // Fetch all balances when dropdown opens
+  useEffect(() => {
+    if (showDropdown && smartAccountAddress) {
+      fetchAllBalances();
+    }
+  }, [showDropdown, smartAccountAddress]);
+
+  // Don't show if not connected
+  if (!smartAccountAddress) {
+    return null;
+  }
+
+  const formatBalance = (bal: string | undefined) => {
+    if (!bal) return "0";
+    const num = parseFloat(bal);
+    if (isHidden) return "****";
+
+    if (num >= 1000000) {
+      return (num / 1000000).toFixed(2) + "M";
+    } else if (num >= 1000) {
+      return (num / 1000).toFixed(2) + "K";
+    } else {
+      return num.toLocaleString(undefined, { maximumFractionDigits: 4 });
+    }
+  };
+
+  const displayBalance = () => {
+    if (isLoading) return "...";
+    return formatBalance(balances[selectedToken.symbol]);
+  };
+
+  const handleTokenSelect = (index: number) => {
+    setSelectedTokenIndex(index);
+    setShowDropdown(false);
+  };
+
+  return (
+    <div className="relative flex items-center gap-2">
+      {/* Balance with Token Selector */}
+      <button
+        onClick={() => setShowDropdown(!showDropdown)}
+        className="flex items-center gap-1.5 px-2 py-1 bg-zinc-800/50 rounded-lg hover:bg-zinc-800 transition-colors"
+      >
+        <Image
+          src={`/icons/${selectedToken.symbol.toLowerCase()}.svg`}
+          alt={selectedToken.symbol}
+          width={16}
+          height={16}
+          className="rounded-full"
+        />
+        <span className="text-white text-xs font-medium">
+          {displayBalance()}
+        </span>
+        <span className="text-zinc-400 text-xs">{selectedToken.symbol}</span>
+        <ChevronDown className="w-3 h-3 text-zinc-400" />
+      </button>
+
+      {/* Eye Toggle */}
+      <button
+        onClick={() => setIsHidden(!isHidden)}
+        className="p-1.5 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-colors"
+        title={isHidden ? "Show balance" : "Hide balance"}
+      >
+        {isHidden ? (
+          <EyeOff className="w-3.5 h-3.5" />
+        ) : (
+          <Eye className="w-3.5 h-3.5" />
+        )}
+      </button>
+
+      {/* Token Dropdown */}
+      {showDropdown && (
+        <>
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 z-40"
+            onClick={() => setShowDropdown(false)}
+          />
+
+          {/* Dropdown Menu */}
+          <div className="absolute top-full right-0 mt-1 z-50 bg-zinc-800 border border-zinc-700 rounded-lg shadow-xl overflow-hidden min-w-48">
+            {isLoadingAll && (
+              <div className="flex items-center justify-center gap-2 py-2 px-3 text-zinc-400 text-xs border-b border-zinc-700">
+                <Loader2 className="w-3 h-3 animate-spin" />
+                Loading balances...
+              </div>
+            )}
+            {TOKENS.map((token, index) => (
+              <button
+                key={token.symbol}
+                onClick={() => handleTokenSelect(index)}
+                className={`w-full flex items-center justify-between gap-2 px-3 py-2 hover:bg-zinc-700 transition-colors ${
+                  index === selectedTokenIndex ? "bg-zinc-700" : ""
+                }`}
+              >
+                <div className="flex items-center gap-2">
+                  <Image
+                    src={`/icons/${token.symbol.toLowerCase()}.svg`}
+                    alt={token.symbol}
+                    width={20}
+                    height={20}
+                    className="rounded-full"
+                  />
+                  <span className="text-white text-sm">{token.symbol}</span>
+                </div>
+                <span className="text-zinc-400 text-xs font-mono">
+                  {formatBalance(balances[token.symbol])}
+                </span>
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}

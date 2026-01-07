@@ -8,6 +8,7 @@ import {
   SwapContent,
   ActivityContent,
 } from "@/components/Menu";
+import { WalletButton, BalanceDisplay } from "@/components/Wallet";
 
 const contentComponents = {
   send: SendContent,
@@ -55,10 +56,21 @@ export default function Home() {
     );
   }
 
-
   return (
-    <div className="min-h-screen bg-zinc-900 p-8">
-      <div className="max-w-2xl mx-auto space-y-8">
+    <div className="min-h-screen bg-zinc-900 p-4 sm:p-8">
+      <div className="max-w-2xl mx-auto space-y-6">
+        {/* Header with Logo and Wallet */}
+        <div className="flex items-start justify-between gap-4">
+          {/* Logo - bigger */}
+          <img src="/logo.svg" alt="ArtaPay" className="h-10 sm:h-12" />
+
+          {/* Wallet Info - Address + Balance */}
+          <div className="flex flex-col items-end gap-2">
+            <WalletButton />
+            <BalanceDisplay />
+          </div>
+        </div>
+
         <Menu activeMenu={activeMenu} onMenuChange={handleMenuChange} />
         <ActiveContent />
       </div>

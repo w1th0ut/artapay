@@ -5,6 +5,8 @@ const nextConfig: NextConfig = {
   turbopack: {
     root: __dirname,
   },
+
+  allowedDevOrigins: ["unwesternized-vonnie-nontangibly.ngrok-free.dev"],
 };
 
 export default nextConfig;

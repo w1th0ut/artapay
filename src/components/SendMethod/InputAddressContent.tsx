@@ -1,58 +1,128 @@
 "use client";
-import { useState, useCallback } from 'react';
-import { CurrencyDropdown, Currency, currencies } from '@/components/Currency';
+import { useState, useCallback, useEffect } from "react";
+import { AlertTriangle } from "lucide-react";
+import { CurrencyDropdown, Currency, currencies } from "@/components/Currency";
+import { useSmartAccount } from "@/hooks/useSmartAccount";
+import { LISK_SEPOLIA } from "@/config/chains";
+import { createPublicClient, http, formatUnits, type Address } from "viem";
+import { ERC20_ABI } from "@/config/abi";
+
+const publicClient = createPublicClient({
+  chain: LISK_SEPOLIA,
+  transport: http(LISK_SEPOLIA.rpcUrls.default.http[0]),
+});
 
 interface SendFormData {
   currency: Currency;
   address: string;
   amount: number;
 }
+
 interface InputAddressContentProps {
   onSend?: (data: SendFormData) => void;
 }
-export default function InputAddressContent({ onSend }: InputAddressContentProps) {
+
+export default function InputAddressContent({
+  onSend,
+}: InputAddressContentProps) {
   const [currency, setCurrency] = useState<Currency>(currencies[0]);
-  const [address, setAddress] = useState('');
+  const [address, setAddress] = useState("");
   const [amount, setAmount] = useState<number>(0);
   const [isLoading, setIsLoading] = useState(false);
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!address.trim()) {
-      alert('Please enter an address');
-      return;
-    }
-    
-    if (amount <= 0) {
-      alert('Please enter a valid amount');
-      return;
-    }
-    setIsLoading(true);
-    
-    try {
-      if (onSend) {
-        await onSend({ currency, address, amount });
-      } else {
-        console.log('Sending:', { currency, address, amount });
+  const [balance, setBalance] = useState<string>("0");
+  const [isLoadingBalance, setIsLoadingBalance] = useState(false);
+
+  const { smartAccountAddress, isReady } = useSmartAccount();
+
+  // Fetch balance when currency or address changes
+  useEffect(() => {
+    const fetchBalance = async () => {
+      if (!smartAccountAddress) {
+        setBalance("0");
+        return;
       }
-    } catch (error) {
-      console.error('Send error:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [currency, address, amount, onSend]);
+
+      setIsLoadingBalance(true);
+      try {
+        const rawBalance = await publicClient.readContract({
+          address: currency.tokenAddress as Address,
+          abi: ERC20_ABI,
+          functionName: "balanceOf",
+          args: [smartAccountAddress],
+        });
+        setBalance(formatUnits(rawBalance as bigint, currency.decimals));
+      } catch (err) {
+        console.error("Failed to fetch balance:", err);
+        setBalance("0");
+      } finally {
+        setIsLoadingBalance(false);
+      }
+    };
+
+    fetchBalance();
+  }, [smartAccountAddress, currency]);
+
+  // Check balance
+  const numBalance = parseFloat(balance) || 0;
+  const hasInsufficientBalance = amount > 0 && amount > numBalance;
+  const hasNoBalance = numBalance === 0;
+
+  const handleSubmit = useCallback(
+    async (e: React.FormEvent) => {
+      e.preventDefault();
+
+      if (!address.trim()) {
+        alert("Please enter an address");
+        return;
+      }
+
+      if (amount <= 0) {
+        alert("Please enter a valid amount");
+        return;
+      }
+
+      if (hasInsufficientBalance) {
+        return;
+      }
+
+      setIsLoading(true);
+
+      try {
+        if (onSend) {
+          await onSend({ currency, address, amount });
+        } else {
+          console.log("Sending:", { currency, address, amount });
+        }
+      } catch (error) {
+        console.error("Send error:", error);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [currency, address, amount, onSend, hasInsufficientBalance]
+  );
+
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseInt(e.target.value) || 0;
+    const value = parseFloat(e.target.value) || 0;
     setAmount(value);
   };
+
   return (
     <div className="p-6">
+      {/* Connect wallet message */}
+      {isReady && !smartAccountAddress && (
+        <div className="mb-4 p-3 bg-yellow-500/20 border border-yellow-500 rounded-lg text-yellow-400 text-sm text-center">
+          Connect wallet to send tokens
+        </div>
+      )}
+
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Send As (Currency Dropdown) */}
         <div className="space-y-2">
           <label className="text-white font-medium">Send as</label>
           <CurrencyDropdown value={currency} onChange={setCurrency} />
         </div>
+
         {/* Address Input */}
         <div className="space-y-2">
           <label className="text-white font-medium">Address</label>
@@ -64,25 +134,71 @@ export default function InputAddressContent({ onSend }: InputAddressContentProps
             className="w-full p-4 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-primary transition-colors"
           />
         </div>
+
         {/* Amount Input */}
         <div className="space-y-2">
-          <label className="text-white font-medium">Amount</label>
+          <div className="flex justify-between items-center">
+            <label className="text-white font-medium">Amount</label>
+            {smartAccountAddress && (
+              <span className="text-xs text-zinc-400">
+                Balance:{" "}
+                {isLoadingBalance
+                  ? "..."
+                  : numBalance.toLocaleString(undefined, {
+                      maximumFractionDigits: 4,
+                    })}{" "}
+                {currency.symbol}
+              </span>
+            )}
+          </div>
           <input
             type="number"
-            value={amount || ''}
+            value={amount || ""}
             onChange={handleAmountChange}
             placeholder="0"
             min="0"
+            step="any"
             className="w-full p-4 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-primary transition-colors"
           />
         </div>
+
+        {/* Insufficient Balance Warning */}
+        {smartAccountAddress && hasInsufficientBalance && (
+          <div className="flex items-center gap-2 p-3 bg-orange-500/20 border border-orange-500 rounded-lg text-orange-400 text-sm">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <span>
+              Insufficient {currency.symbol} balance. You have{" "}
+              {numBalance.toLocaleString(undefined, {
+                maximumFractionDigits: 4,
+              })}{" "}
+              {currency.symbol}
+            </span>
+          </div>
+        )}
+
+        {/* No Balance Warning */}
+        {smartAccountAddress && hasNoBalance && amount === 0 && (
+          <div className="flex items-center gap-2 p-3 bg-zinc-700/50 border border-zinc-600 rounded-lg text-zinc-400 text-sm">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <span>You don't have any {currency.symbol} tokens</span>
+          </div>
+        )}
+
         {/* Send Button */}
         <button
           type="submit"
-          disabled={isLoading}
-          className="w-full py-4 bg-primary text-black font-bold text-xl rounded-full hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          disabled={isLoading || !smartAccountAddress || hasInsufficientBalance}
+          className={`w-full py-4 font-bold text-xl rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
+            hasInsufficientBalance
+              ? "bg-orange-500/50 text-orange-200"
+              : "bg-primary text-black hover:bg-primary/90"
+          }`}
         >
-          {isLoading ? 'SENDING...' : 'SEND NOW'}
+          {isLoading
+            ? "SENDING..."
+            : hasInsufficientBalance
+            ? "INSUFFICIENT BALANCE"
+            : "SEND NOW"}
         </button>
       </form>
     </div>
