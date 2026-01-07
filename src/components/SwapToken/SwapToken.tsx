@@ -6,6 +6,7 @@ import { Currency, currencies } from '@/components/Currency';
 import CurrencyBadge from './CurrencyBadge';
 import CurrencyModal from './CurrencyModal';
 import { getSwapResult, formatNumber, SwapResult } from './GetSwapToken';
+import { ReceiptPopUp, ReceiptData } from '@/components/ReceiptPopUp';
 
 export default function SwapToken() {
   const [fromCurrency, setFromCurrency] = useState<Currency>(currencies[0]); // USDC
@@ -13,6 +14,8 @@ export default function SwapToken() {
   const [amount, setAmount] = useState<string>('');
   const [swapResult, setSwapResult] = useState<SwapResult | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
+  const [receipt, setReceipt] = useState<ReceiptData | null>(null);
+  const [showReceipt, setShowReceipt] = useState(false);
   
   // Modal states
   const [showFromModal, setShowFromModal] = useState(false);
@@ -43,7 +46,7 @@ export default function SwapToken() {
   }, [fromCurrency, toCurrency]);
 
   // Handle swap action
-  const handleSwapNow = () => {
+  const handleSwapNow = async () => {
     if (!swapResult) return;
     
     console.log('Swapping:', {
@@ -54,7 +57,28 @@ export default function SwapToken() {
     });
     
     // TODO: Implement actual swap logic
-    alert(`Swapping ${amount} ${fromCurrency.symbol} to ${formatNumber(swapResult.convertedAmount)} ${toCurrency.symbol}`);
+    // const txHash = await executeSwap(...);
+    
+    // Hardcoded receipt for testing
+    const receiptData: ReceiptData = {
+      id: '1',
+      type: 'swap',
+      status: 'success', // or 'failed'
+      timestamp: new Date(),
+      amount: parseFloat(amount),
+      currency: fromCurrency.symbol,
+      currencyIcon: fromCurrency.icon,
+      swapToAmount: swapResult.convertedAmount,
+      swapToCurrency: toCurrency.symbol,
+      swapToCurrencyIcon: toCurrency.icon,
+    };
+    
+    setReceipt(receiptData);
+    setShowReceipt(true);
+    
+    // Reset form
+    setAmount('');
+    setSwapResult(null);
   };
   
   return (
@@ -145,6 +169,13 @@ export default function SwapToken() {
         onSelect={setToCurrency}
         excludeCurrency={fromCurrency}
       />
+
+      <ReceiptPopUp 
+        isOpen={showReceipt} 
+        data={receipt} 
+        onClose={() => setShowReceipt(false)} 
+      />
+
     </div>
   );
 }

@@ -1,10 +1,13 @@
 "use client";
+
 import { useState } from 'react';
 import ClosedCamera from './ClosedCamera';
 import OpenCamera from './OpenCamera';
 import ImportFromGallery from './ImportFromGallery';
 import TransactionPopup from './TransactionPopup';
 import { currencies } from '@/components/Currency';
+import { ReceiptPopUp, ReceiptData } from '@/components/ReceiptPopUp';
+
 interface TransactionData {
   app: string;
   type: string;
@@ -14,13 +17,18 @@ interface TransactionData {
   amount: number;
   symbol: string;
 }
+
 interface QRCodeProps {
   onScanResult?: (result: string) => void;
 }
+
 export default function QRCode({ onScanResult }: QRCodeProps) {
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [scannedData, setScannedData] = useState<TransactionData | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
+  const [receipt, setReceipt] = useState<ReceiptData | null>(null);
+  const [showReceipt, setShowReceipt] = useState(false);
+
   const handleScanNow = () => {
     setIsCameraOpen(true);
     setImportError(null);
@@ -55,12 +63,30 @@ export default function QRCode({ onScanResult }: QRCodeProps) {
   const handleImportError = (error: string) => {
     setImportError(error);
   };
-  const handleSend = () => {
+
+  const handleSend = async () => {
     console.log("Sending transaction:", scannedData);
+    
     // TODO: Implement actual send logic
-    alert("Transaction sent!");
+    // const txHash = await sendTransaction(scannedData);
+    
+    // Hardcoded receipt for testing
+    const receiptData: ReceiptData = {
+      id: '1',
+      type: 'send',
+      status: 'success', // or 'failed'
+      timestamp: new Date(),
+      amount: scannedData?.amount || 0,
+      currency: scannedData?.symbol || 'USDC',
+      currencyIcon: '/icons/usdc.svg',
+      toAddress: scannedData?.receiver || '',
+    };
+    
+    setReceipt(receiptData);
+    setShowReceipt(true);
     setScannedData(null);
   };
+
   const handleCancel = () => {
     setScannedData(null);
   };
@@ -98,6 +124,11 @@ export default function QRCode({ onScanResult }: QRCodeProps) {
           )}
         </>
       )}
+      <ReceiptPopUp 
+        isOpen={showReceipt} 
+        data={receipt} 
+        onClose={() => setShowReceipt(false)} 
+      />
     </div>
   );
 }
