@@ -1,7 +1,15 @@
 "use client"
 import { useState, useCallback, useMemo, useEffect } from "react";
-import { Menu, SendContent, ReceiveContent, SwapContent, ActivityContent, MenuType } from '@/components/Menu';
-import { UserHeader } from '@/components/User';
+import {
+  Menu,
+  MenuType,
+  SendContent,
+  ReceiveContent,
+  SwapContent,
+  ActivityContent,
+} from "@/components/Menu";
+import { WalletButton, BalanceDisplay } from "@/components/Wallet";
+
 const contentComponents = {
   send: SendContent,
   receive: ReceiveContent,
@@ -9,9 +17,11 @@ const contentComponents = {
   activity: ActivityContent,
 }
 const STORAGE_KEY = "artapay_active_menu";
+
 export default function Home() {
   const [activeMenu, setActiveMenu] = useState<MenuType>("send");
   const [isHydrated, setIsHydrated] = useState(false);
+
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved && ["send", "receive", "swap", "activity"].includes(saved)) {
@@ -19,18 +29,22 @@ export default function Home() {
     }
     setIsHydrated(true);
   }, []);
+
   useEffect(() => {
     if (isHydrated) {
       localStorage.setItem(STORAGE_KEY, activeMenu);
     }
   }, [activeMenu, isHydrated]);
+
   const handleMenuChange = useCallback((menu: MenuType) => {
     setActiveMenu(menu);
   }, []);
+
   const ActiveContent = useMemo(
     () => contentComponents[activeMenu],
     [activeMenu]
   );
+
   if (!isHydrated) {
     return (
       <div className="min-h-screen bg-zinc-900 p-8">
@@ -40,21 +54,24 @@ export default function Home() {
       </div>
     );
   }
+
   return (
-    <div className="min-h-screen bg-zinc-900 p-8">
+    <div className="min-h-screen bg-zinc-900 p-4 sm:p-8">
       <div className="max-w-2xl mx-auto space-y-6">
-        {/* User Header - Balance & Address */}
-        <UserHeader />
-        
-        {/* Menu */}
-        <div className="flex flex-col items-center justify-center">
-          <Menu activeMenu={activeMenu} onMenuChange={handleMenuChange} />
+        {/* Header with Logo and Wallet */}
+        <div className="flex items-start justify-between gap-4">
+          {/* Logo - bigger */}
+          <img src="/logo.svg" alt="ArtaPay" className="h-10 sm:h-12" />
+
+          {/* Wallet Info - Address + Balance */}
+          <div className="flex flex-col items-end gap-2">
+            <WalletButton />
+            <BalanceDisplay />
+          </div>
         </div>
-        
-        {/* Content */}
-        <div>
-          <ActiveContent />
-        </div>
+
+        <Menu activeMenu={activeMenu} onMenuChange={handleMenuChange} />
+        <ActiveContent />
       </div>
     </div>
   );

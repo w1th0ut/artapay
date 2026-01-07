@@ -1,21 +1,26 @@
 "use client";
+import { useState } from "react";
+import ClosedCamera from "./ClosedCamera";
+import OpenCamera from "./OpenCamera";
+import ImportFromGallery from "./ImportFromGallery";
+import TransactionPopup from "./TransactionPopup";
+import { PAYMENT_PROCESSOR_ADDRESS } from "@/config/constants";
+import { LISK_SEPOLIA } from "@/config/chains";
+import { ReceiptPopUp, ReceiptData } from "@/components/ReceiptPopUp";
 
-import { useState } from 'react';
-import ClosedCamera from './ClosedCamera';
-import OpenCamera from './OpenCamera';
-import ImportFromGallery from './ImportFromGallery';
-import TransactionPopup from './TransactionPopup';
-import { currencies } from '@/components/Currency';
-import { ReceiptPopUp, ReceiptData } from '@/components/ReceiptPopUp';
-
-interface TransactionData {
-  app: string;
-  type: string;
+interface PaymentRequestPayload {
+  version: string;
+  processor: string;
   chainId: number;
-  tokenAddress: string;
-  receiver: string;
-  amount: number;
-  symbol: string;
+  request: {
+    recipient: string;
+    requestedToken: string;
+    requestedAmountRaw: string;
+    deadline: number;
+    nonce: string;
+    merchantSigner: string;
+  };
+  signature: string;
 }
 
 interface QRCodeProps {
@@ -24,7 +29,8 @@ interface QRCodeProps {
 
 export default function QRCode({ onScanResult }: QRCodeProps) {
   const [isCameraOpen, setIsCameraOpen] = useState(false);
-  const [scannedData, setScannedData] = useState<TransactionData | null>(null);
+  const [scannedPayload, setScannedPayload] =
+    useState<PaymentRequestPayload | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<ReceiptData | null>(null);
   const [showReceipt, setShowReceipt] = useState(false);
@@ -33,74 +39,91 @@ export default function QRCode({ onScanResult }: QRCodeProps) {
     setIsCameraOpen(true);
     setImportError(null);
   };
+
   const handleBack = () => {
     setIsCameraOpen(false);
   };
+
   const processQRData = (result: string) => {
     try {
-      const data = JSON.parse(result) as TransactionData;
-      
-      // Validate required fields
-      if (!data.app || !data.receiver || !data.amount) {
-        throw new Error('Data QR tidak lengkap');
+      const data = JSON.parse(result);
+
+      // Validate ArtaPay payment request format
+      if (data.version !== "artapay-payment-v2") {
+        throw new Error("Invalid QR format - not an ArtaPay payment request");
       }
-      
-      setScannedData(data);
+
+      if (
+        !data.request?.requestedToken ||
+        !data.request?.recipient ||
+        !data.signature
+      ) {
+        throw new Error("QR data incomplete");
+      }
+
+      // Validate chain and processor
+      if (data.chainId !== LISK_SEPOLIA.id) {
+        throw new Error(
+          `Wrong network. Expected Lisk Sepolia (${LISK_SEPOLIA.id})`
+        );
+      }
+
+      // Check deadline
+      if (
+        data.request.deadline &&
+        data.request.deadline < Math.floor(Date.now() / 1000)
+      ) {
+        throw new Error("Payment request has expired");
+      }
+
+      const payload: PaymentRequestPayload = {
+        version: data.version,
+        processor: data.processor || PAYMENT_PROCESSOR_ADDRESS,
+        chainId: data.chainId,
+        request: {
+          recipient: data.request.recipient,
+          requestedToken: data.request.requestedToken,
+          requestedAmountRaw: data.request.requestedAmountRaw,
+          deadline: data.request.deadline,
+          nonce: data.request.nonce,
+          merchantSigner: data.request.merchantSigner,
+        },
+        signature: data.signature,
+      };
+
+      setScannedPayload(payload);
       setIsCameraOpen(false);
       setImportError(null);
       onScanResult?.(result);
     } catch (e) {
       console.error("Invalid QR data:", e);
-      setImportError('Format QR Code tidak valid untuk ArtaPay');
+      setImportError(e instanceof Error ? e.message : "Invalid QR Code format");
     }
   };
+
   const handleScan = (result: string) => {
     processQRData(result);
   };
+
   const handleImport = (result: string) => {
     processQRData(result);
   };
+
   const handleImportError = (error: string) => {
     setImportError(error);
   };
 
-  const handleSend = async () => {
-    console.log("Sending transaction:", scannedData);
-    
-    // TODO: Implement actual send logic
-    // const txHash = await sendTransaction(scannedData);
-    
-    // Hardcoded receipt for testing
-    const receiptData: ReceiptData = {
-      id: '1',
-      type: 'send',
-      status: 'success', // or 'failed'
-      timestamp: new Date(),
-      amount: scannedData?.amount || 0,
-      currency: scannedData?.symbol || 'USDC',
-      currencyIcon: '/icons/usdc.svg',
-      toAddress: scannedData?.receiver || '',
-    };
-    
-    setReceipt(receiptData);
-    setShowReceipt(true);
-    setScannedData(null);
+  const handleCancel = () => {
+    setScannedPayload(null);
   };
 
-  const handleCancel = () => {
-    setScannedData(null);
-  };
   // Show transaction popup if data scanned
-  if (scannedData) {
+  if (scannedPayload) {
     return (
-      <TransactionPopup
-        data={scannedData}
-        senderCurrency={currencies[0]}
-        onSend={handleSend}
-        onCancel={handleCancel}
-      />
+      <TransactionPopup payload={scannedPayload} onCancel={handleCancel} />
     );
   }
+
   return (
     <div className="flex flex-col items-center gap-6 p-6">
       {isCameraOpen ? (
@@ -108,26 +131,26 @@ export default function QRCode({ onScanResult }: QRCodeProps) {
       ) : (
         <>
           <ClosedCamera onScanNow={handleScanNow} />
-          
+
           <p className="text-accent">or</p>
-          
-          <ImportFromGallery 
-            onImport={handleImport} 
+
+          <ImportFromGallery
+            onImport={handleImport}
             onError={handleImportError}
           />
-          
-          {/* Global Error for invalid QR format */}
-          {importError && importError.includes('Format') && (
+
+          {/* Error Message */}
+          {importError && (
             <div className="p-3 bg-red-500/20 border border-red-500 rounded-lg text-red-400 text-sm text-center max-w-sm">
               {importError}
             </div>
           )}
         </>
       )}
-      <ReceiptPopUp 
-        isOpen={showReceipt} 
-        data={receipt} 
-        onClose={() => setShowReceipt(false)} 
+      <ReceiptPopUp
+        isOpen={showReceipt}
+        data={receipt}
+        onClose={() => setShowReceipt(false)}
       />
     </div>
   );

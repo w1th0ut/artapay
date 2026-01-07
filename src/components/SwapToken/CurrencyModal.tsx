@@ -1,7 +1,8 @@
 "use client";
 
-import Image from 'next/image';
-import { Currency, currencies } from '@/components/Currency';
+import Image from "next/image";
+import { X } from "lucide-react";
+import { Currency, currencies } from "@/components/Currency";
 
 interface CurrencyModalProps {
   isOpen: boolean;
@@ -10,28 +11,34 @@ interface CurrencyModalProps {
   excludeCurrency?: Currency; // Currency to exclude from list
 }
 
-export default function CurrencyModal({ 
-  isOpen, 
-  onClose, 
+export default function CurrencyModal({
+  isOpen,
+  onClose,
   onSelect,
-  excludeCurrency 
+  excludeCurrency,
 }: CurrencyModalProps) {
   if (!isOpen) return null;
-  const availableCurrencies = currencies.filter(c => c.id !== excludeCurrency?.id);
-  
+  const availableCurrencies = currencies.filter(
+    (c) => c.id !== excludeCurrency?.id
+  );
+
   return (
-    <div 
-      className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50"
+    <div
+      className="fixed inset-0 bg-black/80 flex items-end sm:items-center justify-center z-50"
       onClick={onClose}
     >
-      <div 
-        className="w-full max-w-sm bg-zinc-800 rounded-2xl overflow-hidden"
+      <div
+        className="w-full max-w-sm bg-zinc-800 rounded-t-2xl sm:rounded-2xl overflow-hidden max-h-[70vh]"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="p-4 border-b border-zinc-700">
+        <div className="p-4 border-b border-zinc-700 flex items-center justify-between">
+          <span />
           <h3 className="text-white font-bold text-center">Select Currency</h3>
+          <button onClick={onClose} className="text-zinc-400 hover:text-white">
+            <X className="w-5 h-5" />
+          </button>
         </div>
-        <div className="max-h-80 overflow-y-auto">
+        <div className="max-h-[60vh] overflow-y-auto">
           {availableCurrencies.map((currency) => (
             <button
               key={currency.id}
@@ -41,10 +48,10 @@ export default function CurrencyModal({
               }}
               className="w-full flex items-center gap-3 p-4 hover:bg-zinc-700 transition-colors"
             >
-              <Image 
-                src={currency.icon} 
-                alt={currency.name} 
-                width={40} 
+              <Image
+                src={currency.icon}
+                alt={currency.name}
+                width={40}
                 height={40}
                 className="rounded-full"
               />

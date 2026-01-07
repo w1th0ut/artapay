@@ -1,17 +1,52 @@
 @import "tailwindcss";
 
-@theme{
-  --color-primary:#D89B00;
-  --color-secondary:#E1C300;
-  --color-accent:#696969;
-  --color-dark-accent:#262626;
+@theme {
+  --color-primary: #d89b00;
+  --color-secondary: #e1c300;
+  --color-accent: #696969;
+  --color-dark-accent: #262626;
 }
 
-@theme inline{
+@theme inline {
   --font-sans: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
   --font-hero: var(--font-cinzel), serif;
 }
 
-html {
+html,
+body {
   color: white;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Fix for mobile viewport when Privy modal opens */
+html {
+  height: -webkit-fill-available;
+}
+
+body {
+  min-height: 100vh;
+  min-height: -webkit-fill-available;
+}
+
+/* Ensure Privy modal overlays correctly on mobile */
+#privy-modal-container,
+[data-privy-dialog] {
+  position: fixed !important;
+  z-index: 9999 !important;
+}
+
+/* Prevent body scroll when modal is open */
+body.privy-dialog-open {
+  overflow: hidden !important;
+  position: fixed !important;
+  width: 100% !important;
+}
+
+/* Mobile-specific fixes */
+@media (max-width: 640px) {
+  .min-h-screen {
+    min-height: 100vh;
+    min-height: -webkit-fill-available;
+  }
 }
