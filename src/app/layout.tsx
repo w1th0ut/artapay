@@ -30,7 +30,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${poppins.variable} ${cinzel.variable} antialiased font-sans`}
+        className={`${poppins.variable} ${cinzel.variable} antialiased`}
       >
         <Web3Provider>{children}</Web3Provider>
       </body>

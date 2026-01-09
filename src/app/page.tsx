@@ -1,77 +1,174 @@
-"use client"
-import { useState, useCallback, useMemo, useEffect } from "react";
-import {
-  Menu,
-  MenuType,
-  SendContent,
-  ReceiveContent,
-  SwapContent,
-  ActivityContent,
-} from "@/components/Menu";
-import { WalletButton, BalanceDisplay } from "@/components/Wallet";
+"use client";
 
-const contentComponents = {
-  send: SendContent,
-  receive: ReceiveContent,
-  swap: SwapContent,
-  activity: ActivityContent,
+import { useRef, useLayoutEffect } from 'react';
+import { gsap } from 'gsap';
+import { ScrollTrigger } from 'gsap/ScrollTrigger';
+import { StaggeredMenu } from '@/components/StaggeredMenu';
+import { FeatureCards } from '@/components/FeatureCards';
+import TechStack from '@/components/TechStack/TechStack';
+import { Footer } from '@/components/Footer';
+import { AnimatedHero } from '@/components/Hero';
+import ScrollStack, { ScrollStackItem } from '@/components/ScrollStack';
+
+import SendFeature from '@/assets/Send_Feature_Scan.png';
+import ReceiveFeature from '@/assets/Receive_Feature.png';
+import SwapFeature from '@/assets/Swap_Feature.png';
+
+// Register ScrollTrigger plugin
+if (typeof window !== "undefined") {
+  gsap.registerPlugin(ScrollTrigger);
 }
-const STORAGE_KEY = "artapay_active_menu";
+
+const menuItems = [
+  { label: 'Connect Wallet', ariaLabel: 'Connect wallet', link: '/start' },
+  { label: 'Docs', ariaLabel: 'View our documentation', link: 'https://github.com/artapay/' },
+];
+
+const socialItems = [
+  { label: 'Github', link: 'https://github.com/artapay/' },
+  { label: 'X', link: 'https://x.com' },
+  { label: 'Instagram', link: 'https://instagram.com' },
+  { label: 'Discord', link: 'https://discord.com' }
+];
 
 export default function Home() {
-  const [activeMenu, setActiveMenu] = useState<MenuType>("send");
-  const [isHydrated, setIsHydrated] = useState(false);
+  const footerContainerRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved && ["send", "receive", "swap", "activity"].includes(saved)) {
-      setActiveMenu(saved as MenuType);
-    }
-    setIsHydrated(true);
+  useLayoutEffect(() => {
+    // Apply scroll snap to document body for Lenis window scroll
+    document.documentElement.style.scrollSnapType = 'y proximity';
+    document.documentElement.style.scrollBehavior = 'smooth';
+
+    return () => {
+      document.documentElement.style.scrollSnapType = '';
+      document.documentElement.style.scrollBehavior = '';
+    };
   }, []);
 
-  useEffect(() => {
-    if (isHydrated) {
-      localStorage.setItem(STORAGE_KEY, activeMenu);
-    }
-  }, [activeMenu, isHydrated]);
+  useLayoutEffect(() => {
+    const ctx = gsap.context(() => {
+      const footerEl = footerContainerRef.current;
+      if (!footerEl) return;
 
-  const handleMenuChange = useCallback((menu: MenuType) => {
-    setActiveMenu(menu);
+      ScrollTrigger.create({
+        trigger: footerEl,
+        // REVISI LOGIKA:
+        // 'top center' -> Mulai animasi saat BAGIAN ATAS footer menyentuh TENGAH layar
+        // Anda bisa ganti 'top 80%' jika ingin berubah lebih cepat saat baru muncul sedikit
+        start: 'top 60%',
+        end: 'bottom top', // Selesai saat bagian bawah footer menyentuh bagian atas layar
+
+        // Mencegah animasi berjalan ulang saat refresh jika user sudah di bawah
+        // GSAP akan mengkalkulasi ulang saat refresh
+        invalidateOnRefresh: true,
+
+        onEnter: () => {
+          gsap.to(footerEl, {
+            backgroundColor: '#D89B00',
+            duration: 0.5,
+            ease: 'power2.out',
+            overwrite: 'auto' // Mencegah konflik animasi
+          });
+        },
+        onLeaveBack: () => {
+          gsap.to(footerEl, {
+            backgroundColor: '#000000',
+            duration: 0.5,
+            ease: 'power2.out',
+            overwrite: 'auto'
+          });
+        },
+        // Opsional: Handle jika user scroll cepat ke atas melewati footer
+        onEnterBack: () => {
+          gsap.to(footerEl, {
+            backgroundColor: '#D89B00',
+            duration: 0.5,
+            ease: 'power2.out',
+            overwrite: 'auto'
+          });
+        }
+      });
+    }, footerContainerRef); // Scope context ke ref ini
+
+    return () => ctx.revert();
   }, []);
-
-  const ActiveContent = useMemo(
-    () => contentComponents[activeMenu],
-    [activeMenu]
-  );
-
-  if (!isHydrated) {
-    return (
-      <div className="min-h-screen bg-zinc-900 p-8">
-        <div className="max-w-2xl mx-auto space-y-8">
-          {/* Skeleton */}
-        </div>
-      </div>
-    );
-  }
 
   return (
-    <div className="min-h-screen bg-zinc-900 p-4 sm:p-8">
-      <div className="max-w-2xl mx-auto space-y-6">
-        {/* Header with Logo and Wallet */}
-        <div className="flex items-start justify-between gap-4">
-          {/* Logo - bigger */}
-          <img src="/logo.svg" alt="ArtaPay" className="h-10 sm:h-12" />
+    <div
+      className='min-h-screen bg-black'
+    >
+      <StaggeredMenu
+        isFixed={true}
+        position="right"
+        items={menuItems}
+        socialItems={socialItems}
+        displaySocials={true}
+        displayItemNumbering={false}
+        menuButtonColor="#fff"
+        openMenuButtonColor="#fff"
+        changeMenuColorOnOpen={false}
+        colors={['#D89B00', '#E1C300']}
+        logoUrl="/logo.svg"
+        accentColor="#E1C300"
+        onMenuOpen={() => console.log('Menu opened')}
+        onMenuClose={() => console.log('Menu closed')}
+      />
 
-          {/* Wallet Info - Address + Balance */}
-          <div className="flex flex-col items-end gap-2">
-            <WalletButton />
-            <BalanceDisplay />
-          </div>
-        </div>
+      {/* Hero Section - Ini yang akan terlihat pertama kali */}
+      <AnimatedHero />
 
-        <Menu activeMenu={activeMenu} onMenuChange={handleMenuChange} />
-        <ActiveContent />
+      {/* FeatureCards akan muncul setelah user scroll melewati hero */}
+      <FeatureCards />
+
+      <div
+        className="w-full bg-black"
+        style={{ scrollSnapAlign: 'start', scrollSnapStop: 'always' }}
+      >
+        <ScrollStack
+          itemDistance={150}
+          itemScale={0.04}
+          itemStackDistance={40}
+          stackPosition="20%"
+          baseScale={0.9}
+          blurAmount={2}
+          useWindowScroll={true}
+        >
+
+          <ScrollStackItem
+            image={SendFeature.src}
+            label="Send to Anyone"
+            description="Lorem ipsum dolor sit amet"
+          >
+          </ScrollStackItem>
+          <ScrollStackItem
+            image={ReceiveFeature.src}
+            label="Receive from Anyone"
+            description="Lorem ipsum dolor sit amet"
+          >
+          </ScrollStackItem>
+
+          <ScrollStackItem
+            image={SwapFeature.src}
+            label="Swap to Anything"
+            description="Lorem ipsum dolor sit amet"
+          >
+          </ScrollStackItem>
+        </ScrollStack>
+      </div>
+
+      <TechStack />
+
+      {/* Footer Section with scroll-triggered background transition */}
+      <div
+        ref={footerContainerRef}
+        className="min-h-screen w-full relative" // Tambahkan relative & w-full untuk safety layout
+        style={{
+          backgroundColor: '#000000',
+          scrollSnapAlign: 'start',
+          scrollSnapStop: 'always'
+        }} // Set default inline style
+      >
+        <Footer />
       </div>
     </div>
   );
