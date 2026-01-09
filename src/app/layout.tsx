@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Poppins, Cinzel } from "next/font/google";
 import "./globals.css";
 import Web3Provider from "@/providers/Web3Provider";
+import banner from "@/assets/banner.png";
 
 const poppins = Poppins({
   variable: "--font-poppins",
@@ -18,8 +19,20 @@ const cinzel = Cinzel({
 });
 
 export const metadata: Metadata = {
-  title: "ArtaPay - Gasless Payments",
-  description: "Stablecoin payments with QR codes on Lisk Sepolia",
+  title: "ArtaPay - Gasless Stablecoin Payments",
+  description: "Simple QR-based stablecoin payments without gas fees.",
+  metadataBase: new URL("https://artapay.vercel.app"),
+  openGraph: {
+    title: "ArtaPay - Gasless Stablecoin Payments",
+    description: "Simple QR-based stablecoin payments without gas fees.",
+    type: "website",
+    images: [
+      {
+        url: banner.src,
+        alt: "ArtaPay banner",
+      },
+    ],
+  },
 };
 
 export default function RootLayout({
