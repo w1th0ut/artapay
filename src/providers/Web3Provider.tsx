@@ -6,6 +6,7 @@ import { injected } from "wagmi/connectors";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { PrivyProvider } from "@privy-io/react-auth";
 import { LISK_SEPOLIA } from "@/config/chains";
+import { env } from "@/config/env";
 
 const queryClient = new QueryClient();
 
@@ -13,7 +14,7 @@ const wagmiConfig = createConfig({
   chains: [LISK_SEPOLIA],
   connectors: [injected({ shimDisconnect: true })],
   transports: {
-    [LISK_SEPOLIA.id]: http(process.env.NEXT_PUBLIC_RPC_URL),
+    [LISK_SEPOLIA.id]: http(env.rpcUrl),
   },
   multiInjectedProviderDiscovery: false,
 });
@@ -23,7 +24,7 @@ interface Web3ProviderProps {
 }
 
 export default function Web3Provider({ children }: Web3ProviderProps) {
-  const privyAppId = process.env.NEXT_PUBLIC_PRIVY_APP_ID;
+  const privyAppId = env.privyAppId;
 
   if (!privyAppId) {
     // If no Privy App ID, just render children without Web3 providers

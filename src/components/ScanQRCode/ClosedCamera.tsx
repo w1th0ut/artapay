@@ -1,11 +1,12 @@
-import Image from 'next/image';
-import CameraIcon from '@/assets/Camera.svg';
+import Image from "next/image";
+import CameraIcon from "@/assets/Camera.svg";
 
 interface ClosedCameraProps {
   onScanNow: () => void;
+  disabled?: boolean;
 }
 
-export default function ClosedCamera({ onScanNow }: ClosedCameraProps) {
+export default function ClosedCamera({ onScanNow, disabled }: ClosedCameraProps) {
   return (
     <div className="flex flex-col items-center gap-6">
       {/* Camera Preview Box */}
@@ -25,7 +26,10 @@ export default function ClosedCamera({ onScanNow }: ClosedCameraProps) {
       {/* Scan Now Button */}
       <button
         onClick={onScanNow}
-        className="w-full max-w-sm py-4 bg-primary text-black font-bold text-xl rounded-xl hover:bg-primary/90 transition-colors"
+        disabled={disabled}
+        className={`w-full max-w-sm py-4 bg-primary text-black font-bold text-xl rounded-xl transition-colors ${
+          disabled ? "opacity-50 cursor-not-allowed" : "hover:bg-primary/90"
+        }`}
       >
         SCAN NOW
       </button>

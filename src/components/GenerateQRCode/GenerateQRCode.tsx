@@ -28,7 +28,7 @@ interface PaymentRequestPayload {
 
 export default function GenerateQRCode() {
   const [currency, setCurrency] = useState<Currency>(currencies[0]);
-  const [amount, setAmount] = useState<number>(0);
+  const [amountInput, setAmountInput] = useState<string>("");
   const [generatedPayload, setGeneratedPayload] =
     useState<PaymentRequestPayload | null>(null);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -51,7 +51,7 @@ export default function GenerateQRCode() {
   useEffect(() => {
     if (!smartAccountAddress) {
       setGeneratedPayload(null);
-      setAmount(0);
+      setAmountInput("");
       setError(null);
     }
   }, [smartAccountAddress]);
@@ -60,7 +60,8 @@ export default function GenerateQRCode() {
     e.preventDefault();
     setError(null);
 
-    if (amount <= 0) {
+    const parsedAmount = Number(amountInput);
+    if (!amountInput || !Number.isFinite(parsedAmount) || parsedAmount <= 0) {
       setError("Please enter a valid amount");
       return;
     }
@@ -74,7 +75,7 @@ export default function GenerateQRCode() {
 
     try {
       const requestedAmountRaw = parseUnits(
-        amount.toString(),
+        amountInput,
         currency.decimals
       );
       const deadline = Math.floor(Date.now() / 1000) + 5 * 60; // 5 minutes
@@ -147,7 +148,7 @@ export default function GenerateQRCode() {
   const handleReceiptClose = () => {
     setShowReceipt(false);
     setReceipt(null);
-    setAmount(0);
+    setAmountInput("");
   };
 
   if (generatedPayload) {
@@ -185,8 +186,8 @@ export default function GenerateQRCode() {
           <label className="text-white font-medium">Amount</label>
           <input
             type="number"
-            value={amount || ""}
-            onChange={(e) => setAmount(parseFloat(e.target.value) || 0)}
+            value={amountInput}
+            onChange={(e) => setAmountInput(e.target.value)}
             placeholder="0"
             min="0"
             step="0.000001"

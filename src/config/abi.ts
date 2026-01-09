@@ -60,6 +60,17 @@ export const PAYMASTER_ABI = [
     inputs: [{ name: "token", type: "address" }],
     outputs: [{ type: "bool" }],
   },
+  {
+    type: "function",
+    name: "estimateTotalCost",
+    stateMutability: "view",
+    inputs: [
+      { name: "token", type: "address" },
+      { name: "gasLimit", type: "uint256" },
+      { name: "maxFeePerGas", type: "uint256" },
+    ],
+    outputs: [{ name: "gasCost", type: "uint256" }],
+  },
 ] as const;
 
 export const ENTRYPOINT_ABI = [

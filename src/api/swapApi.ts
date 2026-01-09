@@ -1,5 +1,6 @@
-const API_URL =
-  process.env.NEXT_PUBLIC_SIGNER_API_URL || "http://localhost:3001";
+import { env } from "@/config/env";
+
+const API_URL = env.signerApiUrl;
 
 export interface SwapQuoteResponse {
   tokenIn: string;

@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef } from "react";
+import { useRef, useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { Download } from "lucide-react";
 import { currencies } from "@/components/Currency";
@@ -32,6 +32,7 @@ export default function GeneratedQRCode({
 }: GeneratedQRCodeProps) {
   const qrRef = useRef<HTMLDivElement>(null);
   const qrValue = JSON.stringify(data);
+  const [remainingSeconds, setRemainingSeconds] = useState(0);
 
   // Find currency info from token address
   const currency = currencies.find(
@@ -48,10 +49,37 @@ export default function GeneratedQRCode({
   const symbol = currency?.symbol || "Token";
 
   // Calculate remaining time until deadline
-  const deadlineDate = new Date(data.request.deadline * 1000);
-  const now = new Date();
-  const remainingMs = deadlineDate.getTime() - now.getTime();
-  const remainingMinutes = Math.max(0, Math.floor(remainingMs / 60000));
+  const deadlineMs = data.request.deadline * 1000;
+
+  useEffect(() => {
+    const updateRemaining = () => {
+      const remaining =
+        Math.max(0, Math.floor((deadlineMs - Date.now()) / 1000)) || 0;
+      setRemainingSeconds(remaining);
+      if (remaining === 0) {
+        return true;
+      }
+      return false;
+    };
+
+    if (updateRemaining()) {
+      onBack();
+      return;
+    }
+
+    const intervalId = setInterval(() => {
+      if (updateRemaining()) {
+        clearInterval(intervalId);
+        onBack();
+      }
+    }, 1000);
+
+    return () => clearInterval(intervalId);
+  }, [deadlineMs, onBack]);
+
+  const minutes = Math.floor(remainingSeconds / 60);
+  const seconds = remainingSeconds % 60;
+  const formattedTime = `${minutes}:${seconds.toString().padStart(2, "0")}`;
 
   const handleDownload = () => {
     if (!qrRef.current) return;
@@ -106,7 +134,7 @@ export default function GeneratedQRCode({
           {displayAmount} {symbol}
         </p>
         <p className="text-zinc-400 text-sm mt-2">
-          Expires in {remainingMinutes} minutes
+          Expires in {formattedTime}
         </p>
       </div>
 

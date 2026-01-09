@@ -6,7 +6,7 @@ const nextConfig: NextConfig = {
     root: __dirname,
   },
 
-  allowedDevOrigins: ["unwesternized-vonnie-nontangibly.ngrok-free.dev"],
+  allowedDevOrigins: ["artapay.vercel.app", "unwesternized-vonnie-nontangibly.ngrok-free.dev"],
 };
 
 export default nextConfig;

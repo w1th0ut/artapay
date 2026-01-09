@@ -52,14 +52,8 @@ export default function Home() {
 
       ScrollTrigger.create({
         trigger: footerEl,
-        // REVISI LOGIKA:
-        // 'top center' -> Mulai animasi saat BAGIAN ATAS footer menyentuh TENGAH layar
-        // Anda bisa ganti 'top 80%' jika ingin berubah lebih cepat saat baru muncul sedikit
         start: 'top 60%',
-        end: 'bottom top', // Selesai saat bagian bawah footer menyentuh bagian atas layar
-
-        // Mencegah animasi berjalan ulang saat refresh jika user sudah di bawah
-        // GSAP akan mengkalkulasi ulang saat refresh
+        end: 'bottom top',
         invalidateOnRefresh: true,
 
         onEnter: () => {
@@ -67,7 +61,7 @@ export default function Home() {
             backgroundColor: '#D89B00',
             duration: 0.5,
             ease: 'power2.out',
-            overwrite: 'auto' // Mencegah konflik animasi
+            overwrite: 'auto'
           });
         },
         onLeaveBack: () => {
@@ -78,7 +72,6 @@ export default function Home() {
             overwrite: 'auto'
           });
         },
-        // Opsional: Handle jika user scroll cepat ke atas melewati footer
         onEnterBack: () => {
           gsap.to(footerEl, {
             backgroundColor: '#D89B00',
@@ -88,15 +81,13 @@ export default function Home() {
           });
         }
       });
-    }, footerContainerRef); // Scope context ke ref ini
+    }, footerContainerRef);
 
     return () => ctx.revert();
   }, []);
 
   return (
-    <div
-      className='min-h-screen bg-black'
-    >
+    <div className='min-h-screen bg-black'>
       <StaggeredMenu
         isFixed={true}
         position="right"
@@ -114,10 +105,10 @@ export default function Home() {
         onMenuClose={() => console.log('Menu closed')}
       />
 
-      {/* Hero Section - Ini yang akan terlihat pertama kali */}
+      {/* Hero Section */}
       <AnimatedHero />
 
-      {/* FeatureCards akan muncul setelah user scroll melewati hero */}
+      {/* FeatureCards */}
       <FeatureCards />
 
       <div
@@ -133,40 +124,35 @@ export default function Home() {
           blurAmount={2}
           useWindowScroll={true}
         >
-
           <ScrollStackItem
             image={SendFeature.src}
             label="Send to Anyone"
             description="Lorem ipsum dolor sit amet"
-          >
-          </ScrollStackItem>
+          />
           <ScrollStackItem
             image={ReceiveFeature.src}
             label="Receive from Anyone"
             description="Lorem ipsum dolor sit amet"
-          >
-          </ScrollStackItem>
-
+          />
           <ScrollStackItem
             image={SwapFeature.src}
             label="Swap to Anything"
             description="Lorem ipsum dolor sit amet"
-          >
-          </ScrollStackItem>
+          />
         </ScrollStack>
       </div>
 
       <TechStack />
 
-      {/* Footer Section with scroll-triggered background transition */}
+      {/* Footer Section */}
       <div
         ref={footerContainerRef}
-        className="min-h-screen w-full relative" // Tambahkan relative & w-full untuk safety layout
+        className="min-h-screen w-full relative"
         style={{
           backgroundColor: '#000000',
           scrollSnapAlign: 'start',
           scrollSnapStop: 'always'
-        }} // Set default inline style
+        }}
       >
         <Footer />
       </div>

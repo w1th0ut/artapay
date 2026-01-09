@@ -1,10 +1,17 @@
 "use client";
+
 import { useState, useCallback, useEffect } from "react";
 import { AlertTriangle } from "lucide-react";
 import { CurrencyDropdown, Currency, currencies } from "@/components/Currency";
 import { useSmartAccount } from "@/hooks/useSmartAccount";
 import { LISK_SEPOLIA } from "@/config/chains";
-import { createPublicClient, http, formatUnits, type Address } from "viem";
+import {
+  createPublicClient,
+  http,
+  formatUnits,
+  getAddress,
+  type Address,
+} from "viem";
 import { ERC20_ABI } from "@/config/abi";
 
 const publicClient = createPublicClient({
@@ -27,44 +34,60 @@ export default function InputAddressContent({
 }: InputAddressContentProps) {
   const [currency, setCurrency] = useState<Currency>(currencies[0]);
   const [address, setAddress] = useState("");
-  const [amount, setAmount] = useState<number>(0);
-  const [isLoading, setIsLoading] = useState(false);
+  const [amountInput, setAmountInput] = useState<string>("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [balance, setBalance] = useState<string>("0");
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
 
-  const { smartAccountAddress, isReady } = useSmartAccount();
+  const {
+    smartAccountAddress,
+    isReady,
+    sendGaslessTransfer,
+    isLoading,
+    status,
+    error,
+  } = useSmartAccount();
+
+  const fetchBalance = useCallback(async () => {
+    if (!smartAccountAddress) {
+      setBalance("0");
+      return;
+    }
+
+    setIsLoadingBalance(true);
+    try {
+      const rawBalance = await publicClient.readContract({
+        address: currency.tokenAddress as Address,
+        abi: ERC20_ABI,
+        functionName: "balanceOf",
+        args: [smartAccountAddress],
+      });
+      setBalance(formatUnits(rawBalance as bigint, currency.decimals));
+    } catch (err) {
+      console.error("Failed to fetch balance:", err);
+      setBalance("0");
+    } finally {
+      setIsLoadingBalance(false);
+    }
+  }, [smartAccountAddress, currency]);
 
   // Fetch balance when currency or address changes
   useEffect(() => {
-    const fetchBalance = async () => {
-      if (!smartAccountAddress) {
-        setBalance("0");
-        return;
-      }
-
-      setIsLoadingBalance(true);
-      try {
-        const rawBalance = await publicClient.readContract({
-          address: currency.tokenAddress as Address,
-          abi: ERC20_ABI,
-          functionName: "balanceOf",
-          args: [smartAccountAddress],
-        });
-        setBalance(formatUnits(rawBalance as bigint, currency.decimals));
-      } catch (err) {
-        console.error("Failed to fetch balance:", err);
-        setBalance("0");
-      } finally {
-        setIsLoadingBalance(false);
-      }
-    };
-
     fetchBalance();
-  }, [smartAccountAddress, currency]);
+  }, [fetchBalance]);
 
   // Check balance
   const numBalance = parseFloat(balance) || 0;
-  const hasInsufficientBalance = amount > 0 && amount > numBalance;
+  const numAmount = parseFloat(amountInput);
+
+  // Estimate gas fee as 0.5% of amount (heuristic since actual fee depends on Paymaster)
+  const estimatedFee = Number.isFinite(numAmount) ? numAmount * 0.005 : 0;
+  const totalRequired = Number.isFinite(numAmount)
+    ? numAmount + estimatedFee
+    : 0;
+
+  const hasInsufficientBalance =
+    Number.isFinite(numAmount) && numAmount > 0 && totalRequired > numBalance;
   const hasNoBalance = numBalance === 0;
 
   const handleSubmit = useCallback(
@@ -76,7 +99,8 @@ export default function InputAddressContent({
         return;
       }
 
-      if (amount <= 0) {
+      const amountValue = Number.isFinite(numAmount) ? numAmount : 0;
+      if (amountValue <= 0) {
         alert("Please enter a valid amount");
         return;
       }
@@ -85,26 +109,43 @@ export default function InputAddressContent({
         return;
       }
 
-      setIsLoading(true);
+      setIsSubmitting(true);
 
       try {
         if (onSend) {
-          await onSend({ currency, address, amount });
+          await onSend({ currency, address, amount: amountValue });
         } else {
-          console.log("Sending:", { currency, address, amount });
+          const recipient = getAddress(address) as Address;
+          const txHash = await sendGaslessTransfer({
+            recipient,
+            amount: amountValue.toString(),
+            tokenAddress: currency.tokenAddress as Address,
+            decimals: currency.decimals,
+          });
+          alert(`Transfer sent! TX: ${txHash}`);
+          await fetchBalance();
         }
       } catch (error) {
         console.error("Send error:", error);
       } finally {
-        setIsLoading(false);
+        setIsSubmitting(false);
       }
     },
-    [currency, address, amount, onSend, hasInsufficientBalance]
+    [
+      currency,
+      address,
+      numAmount,
+      onSend,
+      hasInsufficientBalance,
+      sendGaslessTransfer,
+      fetchBalance,
+    ]
   );
 
   const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = parseFloat(e.target.value) || 0;
-    setAmount(value);
+    const value = e.target.value.replace(/[^0-9.]/g, "");
+    const sanitized = value.replace(/^(\d*\.\d*).*$/, "$1");
+    setAmountInput(sanitized);
   };
 
   return (
@@ -152,14 +193,24 @@ export default function InputAddressContent({
             )}
           </div>
           <input
-            type="number"
-            value={amount || ""}
+            type="text"
+            inputMode="decimal"
+            value={amountInput}
             onChange={handleAmountChange}
             placeholder="0"
-            min="0"
-            step="any"
             className="w-full p-4 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-primary transition-colors"
           />
+          {smartAccountAddress &&
+            Number.isFinite(numAmount) &&
+            numAmount > 0 && (
+              <div className="text-xs text-right text-zinc-500">
+                Est. Fee: ~
+                {estimatedFee.toLocaleString(undefined, {
+                  maximumFractionDigits: 6,
+                })}{" "}
+                {currency.symbol} (0.5%)
+              </div>
+            )}
         </div>
 
         {/* Insufficient Balance Warning */}
@@ -167,34 +218,53 @@ export default function InputAddressContent({
           <div className="flex items-center gap-2 p-3 bg-orange-500/20 border border-orange-500 rounded-lg text-orange-400 text-sm">
             <AlertTriangle className="w-4 h-4 shrink-0" />
             <span>
-              Insufficient {currency.symbol} balance. You have{" "}
-              {numBalance.toLocaleString(undefined, {
+              Insufficient balance. Required:{" "}
+              {totalRequired.toLocaleString(undefined, {
                 maximumFractionDigits: 4,
               })}{" "}
-              {currency.symbol}
+              {currency.symbol} (incl. fee)
             </span>
           </div>
         )}
 
         {/* No Balance Warning */}
-        {smartAccountAddress && hasNoBalance && amount === 0 && (
+        {smartAccountAddress && hasNoBalance && amountInput === "" && (
           <div className="flex items-center gap-2 p-3 bg-zinc-700/50 border border-zinc-600 rounded-lg text-zinc-400 text-sm">
             <AlertTriangle className="w-4 h-4 shrink-0" />
             <span>You don't have any {currency.symbol} tokens</span>
           </div>
         )}
 
+        {/* Status Message */}
+        {(isSubmitting || isLoading) && (
+          <div className="flex items-center justify-center gap-2 text-primary text-sm">
+            {status || "Sending..."}
+          </div>
+        )}
+
+        {/* Error Message */}
+        {error && (
+          <div className="p-3 bg-red-500/20 border border-red-500 rounded-lg text-red-400 text-sm text-center">
+            {error}
+          </div>
+        )}
+
         {/* Send Button */}
         <button
           type="submit"
-          disabled={isLoading || !smartAccountAddress || hasInsufficientBalance}
+          disabled={
+            isSubmitting ||
+            isLoading ||
+            !smartAccountAddress ||
+            hasInsufficientBalance
+          }
           className={`w-full py-4 font-bold text-xl rounded-full transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
             hasInsufficientBalance
               ? "bg-orange-500/50 text-orange-200"
               : "bg-primary text-black hover:bg-primary/90"
           }`}
         >
-          {isLoading
+          {isSubmitting || isLoading
             ? "SENDING..."
             : hasInsufficientBalance
             ? "INSUFFICIENT BALANCE"

@@ -1,5 +1,5 @@
 "use client";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import ClosedCamera from "./ClosedCamera";
 import OpenCamera from "./OpenCamera";
 import ImportFromGallery from "./ImportFromGallery";
@@ -25,9 +25,10 @@ interface PaymentRequestPayload {
 
 interface QRCodeProps {
   onScanResult?: (result: string) => void;
+  disabled?: boolean;
 }
 
-export default function QRCode({ onScanResult }: QRCodeProps) {
+export default function QRCode({ onScanResult, disabled }: QRCodeProps) {
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [scannedPayload, setScannedPayload] =
     useState<PaymentRequestPayload | null>(null);
@@ -36,6 +37,9 @@ export default function QRCode({ onScanResult }: QRCodeProps) {
   const [showReceipt, setShowReceipt] = useState(false);
 
   const handleScanNow = () => {
+    if (disabled) {
+      return;
+    }
     setIsCameraOpen(true);
     setImportError(null);
   };
@@ -117,6 +121,12 @@ export default function QRCode({ onScanResult }: QRCodeProps) {
     setScannedPayload(null);
   };
 
+  useEffect(() => {
+    if (disabled && isCameraOpen) {
+      setIsCameraOpen(false);
+    }
+  }, [disabled, isCameraOpen]);
+
   // Show transaction popup if data scanned
   if (scannedPayload) {
     return (
@@ -126,17 +136,18 @@ export default function QRCode({ onScanResult }: QRCodeProps) {
 
   return (
     <div className="flex flex-col items-center gap-6 p-6">
-      {isCameraOpen ? (
+      {isCameraOpen && !disabled ? (
         <OpenCamera onScan={handleScan} onBack={handleBack} />
       ) : (
         <>
-          <ClosedCamera onScanNow={handleScanNow} />
+          <ClosedCamera onScanNow={handleScanNow} disabled={disabled} />
 
           <p className="text-accent">or</p>
 
           <ImportFromGallery
             onImport={handleImport}
             onError={handleImportError}
+            disabled={disabled}
           />
 
           {/* Error Message */}

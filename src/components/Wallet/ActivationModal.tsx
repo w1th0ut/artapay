@@ -1,0 +1,224 @@
+"use client";
+
+import { useState } from "react";
+import {
+  AlertCircle,
+  Loader2,
+  Copy,
+  Check,
+  ExternalLink,
+  LogOut,
+} from "lucide-react";
+import { formatEther, parseEther, type Address } from "viem";
+import { usePrivy } from "@privy-io/react-auth";
+import { useSmartAccount } from "@/hooks/useSmartAccount";
+import { TOKENS } from "@/config/constants";
+
+// Minimum ETH required for activation (in ETH)
+const MIN_ETH_REQUIRED = parseEther("0.000001");
+
+interface ActivationModalProps {
+  ethBalance: bigint;
+  onActivate: () => Promise<void>;
+  smartAccountAddress: Address;
+}
+
+export default function ActivationModal({
+  ethBalance,
+  onActivate,
+  smartAccountAddress,
+}: ActivationModalProps) {
+  const [isActivating, setIsActivating] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState(false);
+  const { status } = useSmartAccount();
+  const { logout } = usePrivy();
+
+  const hasEnoughETH = ethBalance >= MIN_ETH_REQUIRED;
+  const ethBalanceFormatted = formatEther(ethBalance);
+  const minEthFormatted = formatEther(MIN_ETH_REQUIRED);
+
+  const handleActivate = async () => {
+    setIsActivating(true);
+    setError(null);
+    try {
+      await onActivate();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Activation failed";
+      setError(message);
+    } finally {
+      setIsActivating(false);
+    }
+  };
+
+  const handleCopyAddress = async () => {
+    try {
+      await navigator.clipboard.writeText(smartAccountAddress);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch (err) {
+      console.error("Failed to copy", err);
+    }
+  };
+
+  const handleLogout = () => {
+    logout();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/90 flex items-end sm:items-center justify-center z-50 backdrop-blur-sm sm:p-4">
+      <div className="w-full max-w-md bg-zinc-900 border-x-2 border-t-2 sm:border-2 border-primary rounded-t-2xl sm:rounded-2xl p-6 space-y-4 sm:space-y-6 max-h-[90vh] overflow-y-auto scrollbar-hide [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+        {/* Header */}
+        <div className="text-center space-y-1 sm:space-y-2">
+          <div className="w-12 h-12 sm:w-16 sm:h-16 bg-primary/20 rounded-full flex items-center justify-center mx-auto">
+            <AlertCircle className="w-6 h-6 sm:w-8 sm:h-8 text-primary" />
+          </div>
+          <h2 className="text-xl sm:text-2xl font-bold text-white">
+            Activate Your Account
+          </h2>
+          <p className="text-zinc-400 text-xs sm:text-sm">
+            One-time setup required for gasless transactions
+          </p>
+        </div>
+
+        {/* Info Box */}
+        <div className="bg-zinc-800 rounded-lg p-3 sm:p-4 space-y-2 sm:space-y-3">
+          <div className="flex items-start gap-3">
+            <div className="w-6 h-6 bg-primary/20 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+              <span className="text-primary text-xs font-bold">1</span>
+            </div>
+            <div className="flex-1">
+              <h3 className="text-white font-semibold text-sm">
+                Approve Tokens
+              </h3>
+              <p className="text-zinc-400 text-xs mt-1">
+                Grant permission for {TOKENS.length} tokens to use gasless
+                features
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-start gap-3">
+            <div className="w-6 h-6 bg-primary/20 rounded-full flex items-center justify-center flex-shrink-0 mt-0.5">
+              <span className="text-primary text-xs font-bold">2</span>
+            </div>
+            <div className="flex-1">
+              <h3 className="text-white font-semibold text-sm">
+                Pay Once, Free Forever
+              </h3>
+              <p className="text-zinc-400 text-xs mt-1">
+                Small ETH fee for this setup, then all future transactions are
+                gasless
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* ETH Balance Check */}
+        <div
+          className={`rounded-lg p-4 border ${
+            hasEnoughETH
+              ? "bg-green-500/10 border-green-500"
+              : "bg-orange-500/10 border-orange-500"
+          }`}
+        >
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-sm font-medium text-white">ETH Balance</span>
+            <span
+              className={`text-lg font-bold ${
+                hasEnoughETH ? "text-green-400" : "text-orange-400"
+              }`}
+            >
+              {parseFloat(ethBalanceFormatted).toFixed(6)} ETH
+            </span>
+          </div>
+
+          {!hasEnoughETH && (
+            <div className="mt-3 space-y-3">
+              <p className="text-orange-300 text-xs">
+                You need at least{" "}
+                <span className="font-bold">{minEthFormatted} ETH</span> to
+                activate your account. Send ETH to your Smart Account:
+              </p>
+              <div className="bg-zinc-800 rounded-lg p-3">
+                <div className="flex items-center justify-between gap-2">
+                  <code className="text-white text-xs font-mono break-all flex-1">
+                    {smartAccountAddress}
+                  </code>
+                  <button
+                    onClick={handleCopyAddress}
+                    className="p-2 hover:bg-zinc-700 rounded-lg transition-colors shrink-0"
+                  >
+                    {copied ? (
+                      <Check className="w-4 h-4 text-green-400" />
+                    ) : (
+                      <Copy className="w-4 h-4 text-zinc-400" />
+                    )}
+                  </button>
+                </div>
+              </div>
+              <a
+                href={`https://sepolia-blockscout.lisk.com/address/${smartAccountAddress}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-2 text-primary text-xs hover:underline"
+              >
+                View on Explorer
+                <ExternalLink className="w-3 h-3" />
+              </a>
+            </div>
+          )}
+        </div>
+
+        {/* Status Message */}
+        {isActivating && status && (
+          <div className="flex items-center gap-2 text-primary text-sm justify-center">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            <span>{status}</span>
+          </div>
+        )}
+
+        {/* Error Message */}
+        {error && (
+          <div className="p-3 bg-red-500/20 border border-red-500 rounded-lg text-red-400 text-sm text-center">
+            {error}
+          </div>
+        )}
+
+        {/* Activate Button */}
+        <button
+          onClick={handleActivate}
+          disabled={!hasEnoughETH || isActivating}
+          className="w-full py-3 sm:py-4 bg-primary text-black font-bold text-lg sm:text-xl rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isActivating ? (
+            <span className="flex items-center justify-center gap-2">
+              <Loader2 className="w-5 h-5 animate-spin" />
+              ACTIVATING...
+            </span>
+          ) : !hasEnoughETH ? (
+            "DEPOSIT ETH FIRST"
+          ) : (
+            "ACTIVATE ACCOUNT"
+          )}
+        </button>
+
+        {/* Switch Account / Logout Button */}
+        <button
+          onClick={handleLogout}
+          disabled={isActivating}
+          className="w-full py-2.5 sm:py-3 border-2 border-zinc-600 text-zinc-300 font-semibold text-sm sm:text-base rounded-xl hover:bg-zinc-800 hover:border-zinc-500 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+        >
+          <LogOut className="w-4 h-4" />
+          LOG OUT
+        </button>
+
+        {/* Footer Note */}
+        <p className="text-center text-zinc-500 text-xs">
+          This is a one-time setup. You can't skip this step to use gasless
+          features.
+        </p>
+      </div>
+    </div>
+  );
+}

@@ -48,9 +48,14 @@ export default function TransactionPopup({
   const [quoteError, setQuoteError] = useState<string | null>(null);
   const [balance, setBalance] = useState<string>("0");
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
-
-  const { smartAccountAddress, payInvoice, isLoading, isReady, status, error } =
-    useSmartAccount();
+  const {
+    smartAccountAddress,
+    payInvoice,
+    isLoading,
+    isReady,
+    status,
+    error,
+  } = useSmartAccount();
 
   const publicClient = useMemo(
     () =>
@@ -60,6 +65,11 @@ export default function TransactionPopup({
       }),
     []
   );
+
+  const processorAddress =
+    payload.processor && payload.processor !== "0x0"
+      ? (payload.processor as `0x${string}`)
+      : (PAYMENT_PROCESSOR_ADDRESS as `0x${string}`);
 
   // Find requested currency
   const requestedCurrency = currencies.find(
@@ -85,7 +95,7 @@ export default function TransactionPopup({
 
       try {
         const breakdown = (await publicClient.readContract({
-          address: PAYMENT_PROCESSOR_ADDRESS,
+          address: processorAddress,
           abi: PAYMENT_PROCESSOR_ABI,
           functionName: "calculatePaymentCost",
           args: [
@@ -110,7 +120,7 @@ export default function TransactionPopup({
     };
 
     fetchQuote();
-  }, [payToken, payload, publicClient]);
+  }, [payToken, payload, publicClient, processorAddress]);
 
   // Fetch balance of payToken
   useEffect(() => {
@@ -145,7 +155,7 @@ export default function TransactionPopup({
   const requiredAmount = quote
     ? Number(formatUnits(quote.totalRequired, payToken.decimals))
     : 0;
-  const hasInsufficientBalance = quote && requiredAmount > numBalance;
+  const hasInsufficientBalance = !!quote && requiredAmount > numBalance;
   const hasNoBalance = numBalance === 0;
 
   const handleSend = async () => {
@@ -153,23 +163,25 @@ export default function TransactionPopup({
 
     try {
       const slippageBps = 100; // 1% slippage buffer
+      const request = {
+        recipient: payload.request.recipient as `0x${string}`,
+        requestedToken: payload.request.requestedToken as `0x${string}`,
+        requestedAmount: BigInt(payload.request.requestedAmountRaw),
+        deadline: BigInt(payload.request.deadline),
+        nonce: payload.request.nonce as `0x${string}`,
+        merchantSigner: payload.request.merchantSigner as `0x${string}`,
+      };
+
       const maxAmountToPay =
         (quote.totalRequired * BigInt(10000 + slippageBps)) / 10000n;
 
       const txHash = await payInvoice({
-        request: {
-          recipient: payload.request.recipient as `0x${string}`,
-          requestedToken: payload.request.requestedToken as `0x${string}`,
-          requestedAmount: BigInt(payload.request.requestedAmountRaw),
-          deadline: BigInt(payload.request.deadline),
-          nonce: payload.request.nonce as `0x${string}`,
-          merchantSigner: payload.request.merchantSigner as `0x${string}`,
-        },
+        request,
         merchantSignature: payload.signature as `0x${string}`,
         payToken: payToken.tokenAddress as `0x${string}`,
         totalRequired: quote.totalRequired,
         maxAmountToPay,
-        paymentProcessorAddress: PAYMENT_PROCESSOR_ADDRESS,
+        paymentProcessorAddress: processorAddress,
       });
 
       alert(`Payment successful! TX: ${txHash}`);

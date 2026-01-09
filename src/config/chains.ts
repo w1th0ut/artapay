@@ -1,14 +1,17 @@
-const DEFAULT_RPC =
-  process.env.NEXT_PUBLIC_RPC_URL || "https://rpc.sepolia-api.lisk.com";
+import { env } from "./env";
 
 export const LISK_SEPOLIA = {
-  id: 4202,
-  name: "Lisk Sepolia",
-  nativeCurrency: { name: "Ether", symbol: "ETH", decimals: 18 },
+  id: env.chainId,
+  name: env.chainName,
+  nativeCurrency: {
+    name: env.nativeCurrencyName,
+    symbol: env.nativeCurrencySymbol,
+    decimals: env.nativeCurrencyDecimals,
+  },
   rpcUrls: {
-    default: { http: [DEFAULT_RPC] },
+    default: { http: [env.rpcUrl] },
   },
   blockExplorers: {
-    default: { name: "Blockscout", url: "https://sepolia-blockscout.lisk.com" },
+    default: { name: env.blockExplorerName, url: env.blockExplorerUrl },
   },
 } as const;
