@@ -11,6 +11,7 @@ import { createPublicClient, http, formatUnits } from "viem";
 import { LISK_SEPOLIA } from "@/config/chains";
 import { PAYMENT_PROCESSOR_ABI, ERC20_ABI } from "@/config/abi";
 import Modal from "@/components/Modal";
+import { ReceiptPopUp, ReceiptData } from "@/components/ReceiptPopUp";
 
 interface PaymentRequestPayload {
   version: string;
@@ -57,6 +58,11 @@ export default function TransactionPopup({
     message: string;
     onRetry?: () => void;
   }>({ isOpen: false, title: "", message: "" });
+
+  // Receipt state
+  const [showReceipt, setShowReceipt] = useState(false);
+  const [receipt, setReceipt] = useState<ReceiptData | null>(null);
+
   const {
     smartAccountAddress,
     payInvoice,
@@ -203,19 +209,34 @@ export default function TransactionPopup({
         paymentProcessorAddress: processorAddress,
       });
 
-      setErrorModal({
-        isOpen: true,
-        title: "Payment Successful",
-        message: `Transaction sent! TX: ${txHash}`,
+      // Show success receipt
+      setReceipt({
+        id: txHash,
+        type: "send",
+        status: "success",
+        timestamp: new Date(),
+        amount: Number(formatUnits(quote.totalRequired, payToken.decimals)),
+        currency: payToken.symbol,
+        currencyIcon: `/icons/${payToken.symbol.toLowerCase()}.svg`,
+        toAddress: payload.request.recipient,
+        txHash: txHash,
       });
-      onCancel();
+      setShowReceipt(true);
     } catch (err) {
       console.error("Payment error:", err);
-      setErrorModal({
-        isOpen: true,
-        title: "Payment Failed",
-        message: err instanceof Error ? err.message : "Payment failed",
+      // Show failure receipt
+      setReceipt({
+        id: Date.now().toString(),
+        type: "send",
+        status: "failed",
+        timestamp: new Date(),
+        amount: Number(formatUnits(quote?.totalRequired || 0n, payToken.decimals)),
+        currency: payToken.symbol,
+        currencyIcon: `/icons/${payToken.symbol.toLowerCase()}.svg`,
+        toAddress: payload.request.recipient,
+        errorMessage: err instanceof Error ? err.message : "Payment failed",
       });
+      setShowReceipt(true);
     }
   };
 
@@ -377,7 +398,7 @@ export default function TransactionPopup({
           <button
             onClick={onCancel}
             disabled={isLoading}
-            className="w-full py-4 border-2 border-accent text-accent font-bold text-xl rounded-xl hover:bg-accent/10 transition-colors disabled:opacity-50"
+            className="w-full py-4 border-2 border-accent text-white font-bold text-xl rounded-xl hover:bg-accent/10 transition-colors disabled:opacity-50"
           >
             CANCEL
           </button>
@@ -397,6 +418,16 @@ export default function TransactionPopup({
         onClose={() => setErrorModal({ ...errorModal, isOpen: false })}
         title={errorModal.title}
         message={errorModal.message}
+      />
+
+      {/* Receipt Popup */}
+      <ReceiptPopUp
+        isOpen={showReceipt}
+        data={receipt}
+        onClose={() => {
+          setShowReceipt(false);
+          onCancel();
+        }}
       />
     </div>
   );

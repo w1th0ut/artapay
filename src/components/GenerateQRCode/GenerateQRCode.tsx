@@ -70,12 +70,20 @@ export default function GenerateQRCode() {
 
     const parsedAmount = Number(amountInput);
     if (!amountInput || !Number.isFinite(parsedAmount) || parsedAmount <= 0) {
-      setError("Please enter a valid amount");
+      setErrorModal({
+        isOpen: true,
+        title: "Validation Error",
+        message: "Please enter a valid amount",
+      });
       return;
     }
 
     if (!smartAccountAddress || !eoaAddress) {
-      setError("Please connect wallet first");
+      setErrorModal({
+        isOpen: true,
+        title: "Connection Error",
+        message: "Please connect wallet first",
+      });
       return;
     }
 
