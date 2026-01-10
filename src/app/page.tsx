@@ -127,17 +127,17 @@ export default function Home() {
           <ScrollStackItem
             image={SendFeature.src}
             label="Send to Anyone"
-            description="Lorem ipsum dolor sit amet"
+            description="Send stablecoin to any recipient with scan QR or Address."
           />
           <ScrollStackItem
             image={ReceiveFeature.src}
             label="Receive from Anyone"
-            description="Lorem ipsum dolor sit amet"
+            description="Accept global payments with minimal fees."
           />
           <ScrollStackItem
             image={SwapFeature.src}
             label="Swap to Anything"
-            description="Lorem ipsum dolor sit amet"
+            description="Swap to any stablecoin you need in one step."
           />
         </ScrollStack>
       </div>
