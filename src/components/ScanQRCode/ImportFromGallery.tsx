@@ -4,6 +4,7 @@ import { useRef, useState } from "react";
 import Image from "next/image";
 import jsQR from "jsqr";
 import ImportIcon from "@/assets/Import_From_Gallery.svg";
+import Modal from "@/components/Modal";
 
 interface ImportFromGalleryProps {
   onImport: (result: string) => void;
@@ -19,6 +20,13 @@ export default function ImportFromGallery({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Error modal state
+  const [errorModal, setErrorModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+  }>({ isOpen: false, title: "", message: "" });
 
   const handleClick = () => {
     if (disabled || isProcessing) {
@@ -99,8 +107,12 @@ export default function ImportFromGallery({
       }
     } catch (err) {
       const errorMsg = typeof err === "string" ? err : "Gagal memproses QR Code";
-      setError(errorMsg);
       onError?.(errorMsg);
+      setErrorModal({
+        isOpen: true,
+        title: "Import Failed",
+        message: errorMsg,
+      });
     } finally {
       setIsProcessing(false);
       // Reset input so same file can be selected again
@@ -133,12 +145,20 @@ export default function ImportFromGallery({
         </span>
       </button>
 
-      {/* Error Message */}
-      {error && (
-        <p className="text-red-500 text-sm mt-2 text-center max-w-xs">
-          {error}
-        </p>
-      )}
+      {/* Error Modal */}
+      <Modal
+        id="import-error-modal"
+        className="modal-alert"
+        role="alertdialog"
+        aria-modal={true}
+        aria-labelledby="alert-title"
+        aria-describedby="alert-desc"
+        tabIndex={-1}
+        isOpen={errorModal.isOpen}
+        onClose={() => setErrorModal({ ...errorModal, isOpen: false })}
+        title={errorModal.title}
+        message={errorModal.message}
+      />
     </div>
   );
 }

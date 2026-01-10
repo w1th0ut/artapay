@@ -203,7 +203,11 @@ export default function TransactionPopup({
         paymentProcessorAddress: processorAddress,
       });
 
-      alert(`Payment successful! TX: ${txHash}`);
+      setErrorModal({
+        isOpen: true,
+        title: "Payment Successful",
+        message: `Transaction sent! TX: ${txHash}`,
+      });
       onCancel();
     } catch (err) {
       console.error("Payment error:", err);

@@ -8,6 +8,7 @@ import { TOKENS } from "@/config/constants";
 import { LISK_SEPOLIA } from "@/config/chains";
 import { createPublicClient, http, formatUnits, type Address } from "viem";
 import { ERC20_ABI } from "@/config/abi";
+import Modal from "@/components/Modal";
 
 const publicClient = createPublicClient({
   chain: LISK_SEPOLIA,
@@ -24,6 +25,14 @@ export default function BalanceDisplay() {
   const [showDropdown, setShowDropdown] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingAll, setIsLoadingAll] = useState(false);
+
+  // Error modal state
+  const [errorModal, setErrorModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onRetry?: () => void;
+  }>({ isOpen: false, title: "", message: "" });
 
   const selectedToken = TOKENS[selectedTokenIndex];
 
@@ -48,8 +57,9 @@ export default function BalanceDisplay() {
               rawBalance as bigint,
               token.decimals
             );
-          } catch {
+          } catch (err) {
             newBalances[token.symbol] = "0";
+            // Don't show modal for individual token failures in batch
           }
         })
       );
@@ -84,6 +94,15 @@ export default function BalanceDisplay() {
       } catch (err) {
         console.error("Failed to fetch balance:", err);
         setBalances((prev) => ({ ...prev, [selectedToken.symbol]: "0" }));
+        setErrorModal({
+          isOpen: true,
+          title: "Balance Error",
+          message: err instanceof Error ? err.message : "Failed to fetch balance",
+          onRetry: () => {
+            setErrorModal({ ...errorModal, isOpen: false });
+            // Trigger refetch by updating a dependency
+          },
+        });
       } finally {
         setIsLoading(false);
       }
@@ -204,6 +223,21 @@ export default function BalanceDisplay() {
           </div>
         </>
       )}
+
+      {/* Error Modal */}
+      <Modal
+        id="balance-error-modal"
+        className="modal-alert"
+        role="alertdialog"
+        aria-modal={true}
+        aria-labelledby="alert-title"
+        aria-describedby="alert-desc"
+        tabIndex={-1}
+        isOpen={errorModal.isOpen}
+        onClose={() => setErrorModal({ ...errorModal, isOpen: false })}
+        title={errorModal.title}
+        message={errorModal.message}
+      />
     </div>
   );
 }

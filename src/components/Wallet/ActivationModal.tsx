@@ -13,6 +13,7 @@ import { formatEther, parseEther, type Address } from "viem";
 import { usePrivy } from "@privy-io/react-auth";
 import { useSmartAccount } from "@/hooks/useSmartAccount";
 import { TOKENS } from "@/config/constants";
+import Modal from "@/components/Modal";
 
 // Minimum ETH required for activation (in ETH)
 const MIN_ETH_REQUIRED = parseEther("0.000001");
@@ -34,6 +35,14 @@ export default function ActivationModal({
   const { status } = useSmartAccount();
   const { logout } = usePrivy();
 
+  // Error modal state for critical errors
+  const [errorModal, setErrorModal] = useState<{
+    isOpen: boolean;
+    title: string;
+    message: string;
+    onRetry?: () => void;
+  }>({ isOpen: false, title: "", message: "" });
+
   const hasEnoughETH = ethBalance >= MIN_ETH_REQUIRED;
   const ethBalanceFormatted = formatEther(ethBalance);
   const minEthFormatted = formatEther(MIN_ETH_REQUIRED);
@@ -46,6 +55,12 @@ export default function ActivationModal({
     } catch (err) {
       const message = err instanceof Error ? err.message : "Activation failed";
       setError(message);
+      setErrorModal({
+        isOpen: true,
+        title: "Activation Failed",
+        message: message,
+        onRetry: handleActivate,
+      });
     } finally {
       setIsActivating(false);
     }
@@ -116,18 +131,16 @@ export default function ActivationModal({
 
         {/* ETH Balance Check */}
         <div
-          className={`rounded-lg p-4 border ${
-            hasEnoughETH
-              ? "bg-green-500/10 border-green-500"
-              : "bg-orange-500/10 border-orange-500"
-          }`}
+          className={`rounded-lg p-4 border ${hasEnoughETH
+            ? "bg-green-500/10 border-green-500"
+            : "bg-orange-500/10 border-orange-500"
+            }`}
         >
           <div className="flex items-center justify-between mb-2">
             <span className="text-sm font-medium text-white">ETH Balance</span>
             <span
-              className={`text-lg font-bold ${
-                hasEnoughETH ? "text-green-400" : "text-orange-400"
-              }`}
+              className={`text-lg font-bold ${hasEnoughETH ? "text-green-400" : "text-orange-400"
+                }`}
             >
               {parseFloat(ethBalanceFormatted).toFixed(6)} ETH
             </span>
@@ -218,6 +231,33 @@ export default function ActivationModal({
           This is a one-time setup. You can't skip this step to use gasless
           features.
         </p>
+
+        {/* Error Modal */}
+        <Modal
+          id="activation-error-modal"
+          className="modal-alert"
+          role="alertdialog"
+          aria-modal={true}
+          aria-labelledby="alert-title"
+          aria-describedby="alert-desc"
+          tabIndex={-1}
+          isOpen={errorModal.isOpen}
+          onClose={() => setErrorModal({ ...errorModal, isOpen: false })}
+          title={errorModal.title}
+          message={errorModal.message}
+        >
+          {errorModal.onRetry && (
+            <button
+              onClick={() => {
+                errorModal.onRetry?.();
+                setErrorModal({ ...errorModal, isOpen: false });
+              }}
+              className="w-full py-4 bg-primary text-black font-bold text-lg rounded-xl hover:bg-primary/90 transition-colors cursor-pointer"
+            >
+              RETRY
+            </button>
+          )}
+        </Modal>
       </div>
     </div>
   );

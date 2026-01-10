@@ -110,13 +110,21 @@ export default function InputAddressContent({
       e.preventDefault();
 
       if (!address.trim()) {
-        alert("Please enter an address");
+        setErrorModal({
+          isOpen: true,
+          title: "Validation Error",
+          message: "Please enter an address",
+        });
         return;
       }
 
       const amountValue = Number.isFinite(numAmount) ? numAmount : 0;
       if (amountValue <= 0) {
-        alert("Please enter a valid amount");
+        setErrorModal({
+          isOpen: true,
+          title: "Validation Error",
+          message: "Please enter a valid amount",
+        });
         return;
       }
 
@@ -137,7 +145,11 @@ export default function InputAddressContent({
             tokenAddress: currency.tokenAddress as Address,
             decimals: currency.decimals,
           });
-          alert(`Transfer sent! TX: ${txHash}`);
+          setErrorModal({
+            isOpen: true,
+            title: "Transfer Successful",
+            message: `Transaction sent! TX: ${txHash}`,
+          });
           await fetchBalance();
         }
       } catch (error) {
