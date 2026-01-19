@@ -7,6 +7,7 @@ import {
   SendContent,
   ReceiveContent,
   SwapContent,
+  TopUpContent,
   ActivityContent,
 } from "@/components/Menu";
 import {
@@ -23,6 +24,7 @@ const contentComponents = {
   send: SendContent,
   receive: ReceiveContent,
   swap: SwapContent,
+  topup: TopUpContent,
   activity: ActivityContent,
 };
 const STORAGE_KEY = "artapay_active_menu";
@@ -37,7 +39,10 @@ export default function Start() {
 
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved && ["send", "receive", "swap", "activity"].includes(saved)) {
+    if (
+      saved &&
+      ["send", "receive", "swap", "topup", "activity"].includes(saved)
+    ) {
       setActiveMenu(saved as MenuType);
     }
     setIsHydrated(true);

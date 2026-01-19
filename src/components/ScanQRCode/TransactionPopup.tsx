@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import Image from "next/image";
@@ -42,6 +42,9 @@ const TOKEN_RATES: Record<string, number> = {
   MXNT: 20000,
   CNHT: 7,
 };
+
+const MULTI_FEE_MULTIPLIER = 1.005;
+const MULTI_VALUE_EPSILON = 1e-6;
 
 // Convert token amount to USD value
 const toUsdValue = (amount: number, tokenSymbol: string): number => {
@@ -115,6 +118,14 @@ export default function TransactionPopup({
     {},
   );
 
+  const feeToken = useMemo(
+    () =>
+      isMultiMode && multiPayments.length > 0
+        ? multiPayments[0].currency
+        : payToken,
+    [isMultiMode, multiPayments, payToken],
+  );
+
   // On-chain verification state for hybrid approach
   const [onChainTotalValue, setOnChainTotalValue] = useState<number | null>(
     null,
@@ -164,7 +175,7 @@ export default function TransactionPopup({
       )
     : 0;
 
-  // Fetch payment quote when payToken changes
+  // Fetch payment quote when fee token changes
   useEffect(() => {
     const fetchQuote = async () => {
       setIsLoadingQuote(true);
@@ -178,20 +189,32 @@ export default function TransactionPopup({
           args: [
             payload.request.requestedToken as `0x${string}`,
             BigInt(payload.request.requestedAmountRaw),
-            payToken.tokenAddress as `0x${string}`,
+            feeToken.tokenAddress as `0x${string}`,
           ],
-        })) as {
-          baseAmount: bigint;
-          platformFee: bigint;
-          swapFee: bigint;
-          totalRequired: bigint;
-        };
+        })) as
+          | {
+              baseAmount: bigint;
+              platformFee: bigint;
+              swapFee: bigint;
+              totalRequired: bigint;
+            }
+          | [bigint, bigint, bigint, bigint];
+
+        const [baseAmount, platformFee, swapFee, totalRequired] =
+          Array.isArray(breakdown)
+            ? breakdown
+            : [
+                breakdown.baseAmount,
+                breakdown.platformFee,
+                breakdown.swapFee,
+                breakdown.totalRequired,
+              ];
 
         setQuote({
-          baseAmount: BigInt(breakdown.baseAmount || breakdown[0] || 0),
-          platformFee: BigInt(breakdown.platformFee || breakdown[1] || 0),
-          swapFee: BigInt(breakdown.swapFee || breakdown[2] || 0),
-          totalRequired: BigInt(breakdown.totalRequired || breakdown[3] || 0),
+          baseAmount: BigInt(baseAmount || 0),
+          platformFee: BigInt(platformFee || 0),
+          swapFee: BigInt(swapFee || 0),
+          totalRequired: BigInt(totalRequired || 0),
         });
       } catch (err) {
         console.error("Quote error:", err);
@@ -210,7 +233,7 @@ export default function TransactionPopup({
     };
 
     fetchQuote();
-  }, [payToken, payload, publicClient, processorAddress]);
+  }, [feeToken, payload, publicClient, processorAddress]);
 
   // Fetch balance of payToken
   useEffect(() => {
@@ -249,7 +272,7 @@ export default function TransactionPopup({
   // Check if balance is sufficient
   const numBalance = parseFloat(balance) || 0;
   const requiredAmount = quote
-    ? Number(formatUnits(quote.totalRequired, payToken.decimals))
+    ? Number(formatUnits(quote.totalRequired, feeToken.decimals))
     : 0;
   const hasInsufficientBalance = !!quote && requiredAmount > numBalance;
   const hasNoBalance = numBalance === 0;
@@ -349,20 +372,32 @@ export default function TransactionPopup({
     }, 0);
   }, [multiPayments]);
 
-  // Calculate required USD value (requested amount + 0.3% platform fee + 0.2% swap buffer)
-  const multiUsdNeeded = useMemo(() => {
-    const baseUsd = toUsdValue(
-      requestedAmount,
-      requestedCurrency?.symbol || "USDC",
-    );
-    const platformFee = baseUsd * 0.003; // 0.3%
-    const swapBuffer = baseUsd * 0.002; // 0.2% buffer for swap losses
-    return baseUsd + platformFee + swapBuffer;
-  }, [requestedAmount, requestedCurrency]);
+  const multiRequiredTotal = useMemo(
+    () => requestedAmount * MULTI_FEE_MULTIPLIER,
+    [requestedAmount],
+  );
 
-  // Check if multi-payment total covers required amount (hardcoded estimate)
+  const multiEstimatedTotal = useMemo(() => {
+    if (!requestedCurrency) return 0;
+    return (
+      multiTotalUsdValue * (TOKEN_RATES[requestedCurrency.symbol] || 1)
+    );
+  }, [multiTotalUsdValue, requestedCurrency]);
+
+  const multiCurrentTotal = useMemo(
+    () => onChainTotalValue ?? multiEstimatedTotal,
+    [onChainTotalValue, multiEstimatedTotal],
+  );
+
+  // Check if multi-payment total covers required amount (estimate/on-chain)
   const hasMultiInsufficientValue =
-    multiTotalUsdValue > 0 && multiTotalUsdValue < multiUsdNeeded;
+    multiCurrentTotal > 0 &&
+    multiCurrentTotal < multiRequiredTotal - MULTI_VALUE_EPSILON;
+
+  const hasMultiExcessValue =
+    multiCurrentTotal > multiRequiredTotal + MULTI_VALUE_EPSILON;
+
+  const multiOverage = Math.max(0, multiCurrentTotal - multiRequiredTotal);
 
   // On-chain verification effect (Optimistic UI: verify in background)
   useEffect(() => {
@@ -435,12 +470,10 @@ export default function TransactionPopup({
     if (!requestedCurrency) return [];
 
     // Calculate shortfall in requested token units
-    const requiredTotal = requestedAmount * 1.005; // Include 0.5% buffer for fees
-    const currentTotal =
-      onChainTotalValue ??
-      multiTotalUsdValue * (TOKEN_RATES[requestedCurrency.symbol] || 1);
+    const requiredTotal = multiRequiredTotal; // Include 0.5% buffer for fees
+    const currentTotal = multiCurrentTotal;
 
-    if (currentTotal >= requiredTotal) return [];
+    if (currentTotal >= requiredTotal - MULTI_VALUE_EPSILON) return [];
 
     const shortfallInRequested = requiredTotal - currentTotal;
 
@@ -459,9 +492,37 @@ export default function TransactionPopup({
       });
   }, [
     multiPayments,
-    onChainTotalValue,
-    multiTotalUsdValue,
-    requestedAmount,
+    multiCurrentTotal,
+    multiRequiredTotal,
+    requestedCurrency,
+  ]);
+
+  const overageOptions = useMemo(() => {
+    if (!requestedCurrency) return [];
+
+    const overageInRequested = multiCurrentTotal - multiRequiredTotal;
+    if (overageInRequested <= MULTI_VALUE_EPSILON) return [];
+
+    return multiPayments
+      .filter((p) => parseFloat(p.amount) > 0)
+      .map((p) => {
+        const rate = TOKEN_RATES[p.currency.symbol] || 1;
+        const requestedRate = TOKEN_RATES[requestedCurrency.symbol] || 1;
+        const overageInThisToken =
+          (overageInRequested / requestedRate) * rate;
+        const currentAmount = parseFloat(p.amount) || 0;
+        const nextAmount = Math.max(0, currentAmount - overageInThisToken);
+        return {
+          symbol: p.currency.symbol,
+          amount: overageInThisToken,
+          currentAmount,
+          nextAmount,
+        };
+      });
+  }, [
+    multiPayments,
+    multiCurrentTotal,
+    multiRequiredTotal,
     requestedCurrency,
   ]);
 
@@ -565,7 +626,7 @@ export default function TransactionPopup({
   };
 
   const formatQuoteAmount = (value: bigint) => {
-    return Number(formatUnits(value, payToken.decimals)).toLocaleString(
+    return Number(formatUnits(value, feeToken.decimals)).toLocaleString(
       undefined,
       {
         maximumFractionDigits: 6,
@@ -648,35 +709,42 @@ export default function TransactionPopup({
                 </button>
               </div>
 
-              {multiPayments.map((entry) => (
+              {multiPayments.map((entry, idx) => (
                 <div
                   key={entry.id}
-                  className="flex gap-2 items-center bg-zinc-700/30 p-3 rounded-lg"
+                  className="bg-zinc-700/30 p-3 rounded-lg space-y-1"
                 >
-                  <div className="flex-1">
-                    <CurrencyDropdown
-                      value={entry.currency}
-                      onChange={(c) =>
-                        updatePaymentEntry(entry.id, "currency", c)
+                  <div className="flex gap-2 items-center">
+                    <div className="flex-1">
+                      <CurrencyDropdown
+                        value={entry.currency}
+                        onChange={(c) =>
+                          updatePaymentEntry(entry.id, "currency", c)
+                        }
+                      />
+                    </div>
+                    <input
+                      type="number"
+                      value={entry.amount}
+                      onChange={(e) =>
+                        updatePaymentEntry(entry.id, "amount", e.target.value)
                       }
+                      placeholder="0"
+                      className="w-28 p-2 bg-zinc-800 border border-zinc-600 rounded-lg text-white text-right focus:outline-none focus:border-primary"
                     />
+                    {multiPayments.length > 1 && (
+                      <button
+                        onClick={() => removePaymentEntry(entry.id)}
+                        className="p-2 text-red-400 hover:text-red-300"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    )}
                   </div>
-                  <input
-                    type="number"
-                    value={entry.amount}
-                    onChange={(e) =>
-                      updatePaymentEntry(entry.id, "amount", e.target.value)
-                    }
-                    placeholder="0"
-                    className="w-28 p-2 bg-zinc-800 border border-zinc-600 rounded-lg text-white text-right focus:outline-none focus:border-primary"
-                  />
-                  {multiPayments.length > 1 && (
-                    <button
-                      onClick={() => removePaymentEntry(entry.id)}
-                      className="p-2 text-red-400 hover:text-red-300"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                  {idx === 0 && (
+                    <div className="text-xs text-primary/80">
+                      Gas fee token
+                    </div>
                   )}
                 </div>
               ))}
@@ -719,11 +787,7 @@ export default function TransactionPopup({
                       ) : (
                         <span className="text-zinc-300">
                           ~
-                          {(
-                            multiTotalUsdValue *
-                            (TOKEN_RATES[requestedCurrency?.symbol || "USDC"] ||
-                              1)
-                          ).toLocaleString(undefined, {
+                          {multiEstimatedTotal.toLocaleString(undefined, {
                             maximumFractionDigits: 4,
                           })}
                           <span className="text-zinc-500 text-xs ml-1">
@@ -738,7 +802,7 @@ export default function TransactionPopup({
                   <div className="flex justify-between text-sm">
                     <span className="text-zinc-400">Required (incl. fees)</span>
                     <span className="text-white font-medium">
-                      {(requestedAmount * 1.005).toLocaleString(undefined, {
+                      {multiRequiredTotal.toLocaleString(undefined, {
                         maximumFractionDigits: 4,
                       })}{" "}
                       {requestedCurrency?.symbol}
@@ -779,13 +843,55 @@ export default function TransactionPopup({
                     </div>
                   )}
 
+                  {hasMultiExcessValue && (
+                    <div className="p-2 bg-red-500/20 border border-red-500/50 rounded-lg">
+                      <div className="flex items-center gap-2 text-red-400 text-sm font-medium mb-1">
+                        <AlertTriangle className="w-4 h-4" />
+                        Amount exceeds required total
+                      </div>
+                      <div className="text-xs text-red-300 space-y-0.5">
+                        {overageOptions.map((opt, idx) => (
+                          <div key={opt.symbol}>
+                            {idx > 0 && (
+                              <span className="text-red-400/70">or </span>
+                            )}
+                            <span className="font-mono">
+                              -
+                              {opt.amount.toLocaleString(undefined, {
+                                maximumFractionDigits: 6,
+                              })}
+                            </span>
+                            <span className="ml-1">{opt.symbol}</span>
+                            <span className="ml-1 text-red-400/80">
+                              (
+                              {opt.nextAmount.toLocaleString(undefined, {
+                                maximumFractionDigits: 6,
+                              })}{" "}
+                              {opt.symbol})
+                            </span>
+                          </div>
+                        ))}
+                        {overageOptions.length === 0 && (
+                          <div>
+                            Reduce by ~
+                            {multiOverage.toLocaleString(undefined, {
+                              maximumFractionDigits: 6,
+                            })}{" "}
+                            {requestedCurrency?.symbol}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
                   {/* Success Indicator */}
                   {shortfallOptions.length === 0 &&
                     onChainTotalValue !== null &&
-                    onChainTotalValue >= requestedAmount * 1.005 && (
+                    !hasMultiInsufficientValue &&
+                    !hasMultiExcessValue && (
                       <div className="flex items-center gap-2 text-green-400 text-sm">
                         <CheckCircle className="w-4 h-4" />
-                        Sufficient amount ✓
+                        Sufficient amount
                       </div>
                     )}
                 </div>
@@ -833,7 +939,7 @@ export default function TransactionPopup({
               <div className="flex justify-between text-sm">
                 <span className="text-zinc-400">Swap Fee</span>
                 <span className="text-zinc-300">
-                  {formatQuoteAmount(quote.swapFee)} {payToken.symbol}
+                  {formatQuoteAmount(quote.swapFee)} {feeToken.symbol}
                 </span>
               </div>
               <div className="flex justify-between">
@@ -842,7 +948,7 @@ export default function TransactionPopup({
                   <span className="text-primary font-bold">
                     {formatQuoteAmount(quote.totalRequired)}
                   </span>
-                  <span className="text-white ml-1">{payToken.symbol}</span>
+                  <span className="text-white ml-1">{feeToken.symbol}</span>
                 </span>
               </div>
             </div>
@@ -902,6 +1008,7 @@ export default function TransactionPopup({
               (isMultiMode
                 ? hasMultiInsufficientBalance ||
                   hasMultiInsufficientValue ||
+                  hasMultiExcessValue ||
                   multiPayments.every((p) => !parseFloat(p.amount))
                 : !quote || hasInsufficientBalance)
             }
@@ -909,14 +1016,14 @@ export default function TransactionPopup({
           >
             {isLoading
               ? "PROCESSING..."
-              : (
-                    isMultiMode
-                      ? hasMultiInsufficientBalance || hasMultiInsufficientValue
-                      : hasInsufficientBalance
-                  )
-                ? "INSUFFICIENT AMOUNT"
-                : isMultiMode
-                  ? "PAY WITH MULTI-TOKEN"
+              : isMultiMode
+                ? hasMultiExcessValue
+                  ? "AMOUNT TOO HIGH"
+                  : hasMultiInsufficientBalance || hasMultiInsufficientValue
+                    ? "INSUFFICIENT AMOUNT"
+                    : "PAY WITH MULTI-TOKEN"
+                : hasInsufficientBalance
+                  ? "INSUFFICIENT AMOUNT"
                   : "PAY NOW"}
           </button>
           <button
@@ -956,3 +1063,4 @@ export default function TransactionPopup({
     </div>
   );
 }
+

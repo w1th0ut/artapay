@@ -1,9 +1,16 @@
 "use client";
 import { useCallback, useMemo } from 'react';
-import { Send, ArrowDownUp, ArrowDownLeft, RotateCw, LucideIcon } from 'lucide-react';
+import {
+  Send,
+  ArrowDownUp,
+  ArrowDownLeft,
+  RotateCw,
+  Coins,
+  LucideIcon,
+} from "lucide-react";
 import MenuItem from './MenuItem';
 
-export type MenuType = "send" | "receive" | "swap" | "activity";
+export type MenuType = "send" | "receive" | "swap" | "topup" | "activity";
 interface MenuProps {
   activeMenu: MenuType;
   onMenuChange: (menu: MenuType) => void;
@@ -17,6 +24,7 @@ const menuItemsData: MenuItemData[] = [
   { id: "send", label: "Send", Icon: Send },
   { id: "receive", label: "Receive", Icon: ArrowDownLeft },
   { id: "swap", label: "Swap", Icon: ArrowDownUp },
+  { id: "topup", label: "Top Up", Icon: Coins },
   { id: "activity", label: "Activity", Icon: RotateCw },
 ];
 export default function Menu({ activeMenu, onMenuChange }: MenuProps) {
@@ -41,7 +49,7 @@ export default function Menu({ activeMenu, onMenuChange }: MenuProps) {
   );
   return (
     <div className="w-full">
-      <div className="grid grid-cols-4 gap-4 mb-4">{menuItems}</div>
+      <div className="grid grid-cols-5 gap-4 mb-4">{menuItems}</div>
     </div>
   );
 }
