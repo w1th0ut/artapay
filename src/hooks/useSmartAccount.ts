@@ -84,7 +84,7 @@ export function useSmartAccount() {
       }
 
       const embedded = wallets.find(
-        (w) => w.type === "ethereum" && w.walletClientType === "privy"
+        (w) => w.type === "ethereum" && w.walletClientType === "privy",
       );
       const chosen = embedded; // force embedded-only
 
@@ -94,7 +94,7 @@ export function useSmartAccount() {
         setEoaAddress(null);
         setWalletSource(null);
         setStatus(
-          "No embedded wallet found. Enable embedded wallet (createOnLogin) in Privy and re-login."
+          "No embedded wallet found. Enable embedded wallet (createOnLogin) in Privy and re-login.",
         );
         return;
       }
@@ -113,7 +113,7 @@ export function useSmartAccount() {
         setEffectiveWalletClient(privyWalletClient);
         setEoaAddress(addr);
         setWalletSource(
-          chosen.walletClientType === "privy" ? "embedded" : "external"
+          chosen.walletClientType === "privy" ? "embedded" : "external",
         );
       } catch (err) {
         console.error("Failed to init Privy wallet", err);
@@ -200,7 +200,7 @@ export function useSmartAccount() {
         chain: LISK_SEPOLIA,
         transport: http(LISK_SEPOLIA.rpcUrls.default.http[0]),
       }),
-    []
+    [],
   );
 
   const bundlerClient = useMemo(
@@ -209,12 +209,13 @@ export function useSmartAccount() {
         chain: LISK_SEPOLIA,
         transport: http(GELATO_BUNDLER_URL),
       }),
-    []
+    [],
   );
 
   const getFeeParams = useCallback(async () => {
+    // Increased buffer to 150% to handle network congestion and bundler requirements
     const addBuffer = (value: bigint) => {
-      const bumped = (value * 12n) / 10n; // +20%
+      const bumped = (value * 30n) / 10n; // +200% (3.0x multiplier)
       return bumped > value ? bumped : value + 1n;
     };
 
@@ -235,7 +236,8 @@ export function useSmartAccount() {
 
   const waitForUserOp = useCallback(
     async (userOpHash: `0x${string}`) => {
-      for (let i = 0; i < 20; i++) {
+      // Increased to 40 iterations (40 x 3s = 120s) for complex multi-token transactions
+      for (let i = 0; i < 40; i++) {
         try {
           const receipt = (await bundlerClient.request({
             // viem types don't include 4337, so cast
@@ -259,7 +261,7 @@ export function useSmartAccount() {
                 (l: any) =>
                   l.topics &&
                   l.topics.length > 0 &&
-                  l.topics[0] === userOpEventTopic
+                  l.topics[0] === userOpEventTopic,
               );
               if (entryLog) {
                 // success is the 5th non-indexed slot in data
@@ -286,7 +288,7 @@ export function useSmartAccount() {
         reason: "Timed out waiting for receipt",
       };
     },
-    [bundlerClient]
+    [bundlerClient],
   );
 
   const ensureClient = useCallback(async () => {
@@ -357,7 +359,7 @@ export function useSmartAccount() {
         setIsLoading(false);
       }
     },
-    [ensureClient, getFeeParams]
+    [ensureClient, getFeeParams],
   );
 
   const claimFaucet = useCallback(
@@ -393,7 +395,7 @@ export function useSmartAccount() {
         setIsLoading(false);
       }
     },
-    [ensureClient, getFeeParams]
+    [ensureClient, getFeeParams],
   );
 
   const sendGaslessTransfer = useCallback(
@@ -457,7 +459,7 @@ export function useSmartAccount() {
           const msg = err instanceof Error ? err.message : "send failed";
           if (msg.includes("Failed to fetch")) {
             throw new Error(
-              `Bundler RPC unreachable at ${GELATO_BUNDLER_URL} (${msg})`
+              `Bundler RPC unreachable at ${GELATO_BUNDLER_URL} (${msg})`,
             );
           }
           throw err;
@@ -480,7 +482,7 @@ export function useSmartAccount() {
         setIsLoading(false);
       }
     },
-    [ensureClient, getFeeParams, waitForUserOp]
+    [ensureClient, getFeeParams, waitForUserOp],
   );
 
   const swapTokens = useCallback(
@@ -580,7 +582,7 @@ export function useSmartAccount() {
         setIsLoading(false);
       }
     },
-    [ensureClient, getFeeParams, waitForUserOp]
+    [ensureClient, getFeeParams, waitForUserOp],
   );
 
   const payInvoice = useCallback(
@@ -696,7 +698,132 @@ export function useSmartAccount() {
         setIsLoading(false);
       }
     },
-    [ensureClient, getFeeParams, waitForUserOp]
+    [ensureClient, getFeeParams, waitForUserOp],
+  );
+
+  const payMultiTokenInvoice = useCallback(
+    async (params: {
+      request: {
+        recipient: Address;
+        requestedToken: Address;
+        requestedAmount: bigint;
+        deadline: bigint;
+        nonce: `0x${string}`;
+        merchantSigner: Address;
+      };
+      merchantSignature: `0x${string}`;
+      payments: { token: Address; amount: bigint }[];
+      paymentProcessorAddress?: Address;
+    }) => {
+      setError(null);
+      setIsLoading(true);
+      try {
+        if (params.payments.length === 0) {
+          throw new Error("At least one payment token required");
+        }
+
+        const { client, address } = await ensureClient();
+        const feeParams = await getFeeParams();
+
+        // Use first payment token for paymaster fee
+        const feeToken = params.payments[0].token;
+
+        const validUntil = Math.floor(Date.now() / 1000) + 3600;
+        const validAfter = 0;
+        setStatus("Requesting paymaster signature for multi-token payment...");
+        const signature = await getPaymasterSignature({
+          payerAddress: address,
+          tokenAddress: feeToken,
+          validUntil,
+          validAfter,
+        });
+
+        const paymasterData = buildPaymasterData({
+          tokenAddress: feeToken,
+          payerAddress: address,
+          validUntil,
+          validAfter,
+          hasPermit: false,
+          signature: signature as `0x${string}`,
+        });
+
+        const processor =
+          params.paymentProcessorAddress || PAYMENT_PROCESSOR_ADDRESS;
+        const calls: { to: Address; data: `0x${string}`; value: bigint }[] = [];
+
+        // Build approve calls for each unique token
+        const uniqueTokens = [...new Set(params.payments.map((p) => p.token))];
+        for (const token of uniqueTokens) {
+          calls.push({
+            to: token,
+            data: encodeFunctionData({
+              abi: ERC20_ABI,
+              functionName: "approve",
+              args: [processor, maxUint256],
+            }),
+            value: BigInt(0),
+          });
+        }
+
+        // Build payments array for contract call
+        const paymentsArg = params.payments.map((p) => ({
+          token: p.token,
+          amount: p.amount,
+        }));
+
+        // Add executeMultiTokenPayment call
+        calls.push({
+          to: processor,
+          data: encodeFunctionData({
+            abi: PAYMENT_PROCESSOR_ABI,
+            functionName: "executeMultiTokenPayment",
+            args: [
+              [
+                params.request.recipient,
+                params.request.requestedToken,
+                params.request.requestedAmount,
+                params.request.deadline,
+                params.request.nonce,
+                params.request.merchantSigner,
+              ],
+              params.merchantSignature,
+              paymentsArg,
+            ],
+          }),
+          value: BigInt(0),
+        });
+
+        setStatus("Submitting multi-token payment UserOperation...");
+        const res = await client.sendCalls({
+          calls,
+          paymaster: PAYMASTER_ADDRESS,
+          paymasterData,
+          paymasterVerificationGasLimit: BigInt(300_000),
+          paymasterPostOpGasLimit: BigInt(300_000),
+          callGasLimit: BigInt(2_000_000),
+          verificationGasLimit: BigInt(1_200_000),
+          ...feeParams,
+        });
+
+        const userOpHash = res.id as `0x${string}`;
+        setStatus("Waiting for multi-token payment execution...");
+        const receipt = await waitForUserOp(userOpHash);
+        if (!receipt.success) {
+          throw new Error(receipt.reason || "Multi-token payment failed");
+        }
+
+        setStatus("Multi-token payment executed");
+        return receipt.txHash || userOpHash;
+      } catch (err) {
+        const message = transformError(err);
+        setError(message);
+        setStatus(message);
+        throw new Error(message);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [ensureClient, getFeeParams, waitForUserOp],
   );
 
   const signMessageWithEOA = useCallback(
@@ -708,7 +835,7 @@ export function useSmartAccount() {
         message: { raw: hash },
       } as any);
     },
-    [effectiveWalletClient]
+    [effectiveWalletClient],
   );
 
   return {
@@ -725,6 +852,7 @@ export function useSmartAccount() {
     initSmartAccount: ensureClient,
     swapTokens,
     payInvoice,
+    payMultiTokenInvoice,
     signMessageWithEOA,
   };
 }

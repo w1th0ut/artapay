@@ -196,6 +196,35 @@ export const PAYMENT_PROCESSOR_ABI = [
     outputs: [],
   },
   {
+    type: "function",
+    name: "executeMultiTokenPayment",
+    stateMutability: "nonpayable",
+    inputs: [
+      {
+        name: "request",
+        type: "tuple",
+        components: [
+          { name: "recipient", type: "address" },
+          { name: "requestedToken", type: "address" },
+          { name: "requestedAmount", type: "uint256" },
+          { name: "deadline", type: "uint256" },
+          { name: "nonce", type: "bytes32" },
+          { name: "merchantSigner", type: "address" },
+        ],
+      },
+      { name: "merchantSignature", type: "bytes" },
+      {
+        name: "payments",
+        type: "tuple[]",
+        components: [
+          { name: "token", type: "address" },
+          { name: "amount", type: "uint256" },
+        ],
+      },
+    ],
+    outputs: [],
+  },
+  {
     type: "event",
     name: "PaymentCompleted",
     inputs: [
@@ -206,6 +235,68 @@ export const PAYMENT_PROCESSOR_ABI = [
       { indexed: false, name: "payToken", type: "address" },
       { indexed: false, name: "requestedAmount", type: "uint256" },
       { indexed: false, name: "paidAmount", type: "uint256" },
+    ],
+  },
+  {
+    type: "event",
+    name: "MultiTokenPaymentCompleted",
+    inputs: [
+      { indexed: true, name: "nonce", type: "bytes32" },
+      { indexed: true, name: "recipient", type: "address" },
+      { indexed: true, name: "payer", type: "address" },
+      { indexed: false, name: "requestedToken", type: "address" },
+      { indexed: false, name: "requestedAmount", type: "uint256" },
+      { indexed: false, name: "tokensUsed", type: "address[]" },
+      { indexed: false, name: "amountsUsed", type: "uint256[]" },
+    ],
+  },
+] as const;
+
+export const STABLECOIN_REGISTRY_ABI = [
+  {
+    type: "function",
+    name: "convert",
+    stateMutability: "view",
+    inputs: [
+      { name: "fromToken", type: "address" },
+      { name: "toToken", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [{ name: "convertedAmount", type: "uint256" }],
+  },
+  {
+    type: "function",
+    name: "getStablecoin",
+    stateMutability: "view",
+    inputs: [{ name: "token", type: "address" }],
+    outputs: [
+      {
+        name: "info",
+        type: "tuple",
+        components: [
+          { name: "tokenAddress", type: "address" },
+          { name: "symbol", type: "string" },
+          { name: "decimals", type: "uint8" },
+          { name: "region", type: "string" },
+          { name: "rateToUSD", type: "uint256" },
+          { name: "isActive", type: "bool" },
+        ],
+      },
+    ],
+  },
+  {
+    type: "function",
+    name: "getConversionQuote",
+    stateMutability: "view",
+    inputs: [
+      { name: "fromToken", type: "address" },
+      { name: "toToken", type: "address" },
+      { name: "amount", type: "uint256" },
+    ],
+    outputs: [
+      { name: "toAmount", type: "uint256" },
+      { name: "fromRate", type: "uint256" },
+      { name: "toRate", type: "uint256" },
     ],
   },
 ] as const;

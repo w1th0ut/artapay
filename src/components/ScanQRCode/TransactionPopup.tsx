@@ -1,17 +1,53 @@
 "use client";
 
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useCallback } from "react";
 import Image from "next/image";
-import { Loader2, AlertTriangle } from "lucide-react";
+import {
+  Loader2,
+  AlertTriangle,
+  Plus,
+  Trash2,
+  CheckCircle,
+} from "lucide-react";
 import { useSmartAccount } from "@/hooks/useSmartAccount";
 import { currencies, Currency } from "@/components/Currency";
 import { CurrencyDropdown } from "@/components/Currency";
-import { PAYMENT_PROCESSOR_ADDRESS } from "@/config/constants";
-import { createPublicClient, http, formatUnits } from "viem";
+import {
+  PAYMENT_PROCESSOR_ADDRESS,
+  STABLECOIN_REGISTRY_ADDRESS,
+} from "@/config/constants";
+import {
+  createPublicClient,
+  http,
+  formatUnits,
+  parseUnits,
+  type Address,
+} from "viem";
 import { LISK_SEPOLIA } from "@/config/chains";
-import { PAYMENT_PROCESSOR_ABI, ERC20_ABI } from "@/config/abi";
+import {
+  PAYMENT_PROCESSOR_ABI,
+  ERC20_ABI,
+  STABLECOIN_REGISTRY_ABI,
+} from "@/config/abi";
 import Modal from "@/components/Modal";
 import { ReceiptPopUp, ReceiptData } from "@/components/ReceiptPopUp";
+
+// Token rates: how many tokens equal 1 USD
+const TOKEN_RATES: Record<string, number> = {
+  USDC: 1,
+  USDT: 1,
+  IDRX: 16000,
+  JPYC: 150,
+  EURC: 0.92,
+  MXNT: 20000,
+  CNHT: 7,
+};
+
+// Convert token amount to USD value
+const toUsdValue = (amount: number, tokenSymbol: string): number => {
+  const rate = TOKEN_RATES[tokenSymbol] || 1;
+  return amount / rate;
+};
 
 interface PaymentRequestPayload {
   version: string;
@@ -40,6 +76,13 @@ interface PaymentQuote {
   totalRequired: bigint;
 }
 
+interface TokenPaymentEntry {
+  id: string;
+  currency: Currency;
+  amount: string;
+  balance: string;
+}
+
 export default function TransactionPopup({
   payload,
   onCancel,
@@ -63,9 +106,28 @@ export default function TransactionPopup({
   const [showReceipt, setShowReceipt] = useState(false);
   const [receipt, setReceipt] = useState<ReceiptData | null>(null);
 
+  // Multi-token mode state
+  const [isMultiMode, setIsMultiMode] = useState(false);
+  const [multiPayments, setMultiPayments] = useState<TokenPaymentEntry[]>([
+    { id: "1", currency: currencies[0], amount: "", balance: "0" },
+  ]);
+  const [multiBalances, setMultiBalances] = useState<Record<string, string>>(
+    {},
+  );
+
+  // On-chain verification state for hybrid approach
+  const [onChainTotalValue, setOnChainTotalValue] = useState<number | null>(
+    null,
+  );
+  const [isVerifying, setIsVerifying] = useState(false);
+  const [verificationError, setVerificationError] = useState<string | null>(
+    null,
+  );
+
   const {
     smartAccountAddress,
     payInvoice,
+    payMultiTokenInvoice,
     isLoading,
     isReady,
     status,
@@ -78,7 +140,7 @@ export default function TransactionPopup({
         chain: LISK_SEPOLIA,
         transport: http(LISK_SEPOLIA.rpcUrls.default.http[0]),
       }),
-    []
+    [],
   );
 
   const processorAddress =
@@ -90,16 +152,16 @@ export default function TransactionPopup({
   const requestedCurrency = currencies.find(
     (c) =>
       c.tokenAddress.toLowerCase() ===
-      payload.request.requestedToken.toLowerCase()
+      payload.request.requestedToken.toLowerCase(),
   );
 
   const requestedAmount = requestedCurrency
     ? Number(
-      formatUnits(
-        BigInt(payload.request.requestedAmountRaw),
-        requestedCurrency.decimals
+        formatUnits(
+          BigInt(payload.request.requestedAmountRaw),
+          requestedCurrency.decimals,
+        ),
       )
-    )
     : 0;
 
   // Fetch payment quote when payToken changes
@@ -118,7 +180,12 @@ export default function TransactionPopup({
             BigInt(payload.request.requestedAmountRaw),
             payToken.tokenAddress as `0x${string}`,
           ],
-        })) as any;
+        })) as {
+          baseAmount: bigint;
+          platformFee: bigint;
+          swapFee: bigint;
+          totalRequired: bigint;
+        };
 
         setQuote({
           baseAmount: BigInt(breakdown.baseAmount || breakdown[0] || 0),
@@ -132,7 +199,10 @@ export default function TransactionPopup({
         setErrorModal({
           isOpen: true,
           title: "Quote Error",
-          message: err instanceof Error ? err.message : "Failed to calculate payment cost",
+          message:
+            err instanceof Error
+              ? err.message
+              : "Failed to calculate payment cost",
         });
       } finally {
         setIsLoadingQuote(false);
@@ -165,7 +235,8 @@ export default function TransactionPopup({
         setErrorModal({
           isOpen: true,
           title: "Balance Error",
-          message: err instanceof Error ? err.message : "Failed to fetch balance",
+          message:
+            err instanceof Error ? err.message : "Failed to fetch balance",
         });
       } finally {
         setIsLoadingBalance(false);
@@ -183,56 +254,304 @@ export default function TransactionPopup({
   const hasInsufficientBalance = !!quote && requiredAmount > numBalance;
   const hasNoBalance = numBalance === 0;
 
+  // Multi-token helpers
+  const addPaymentEntry = () => {
+    const availableCurrencies = currencies.filter(
+      (c) =>
+        !multiPayments.some((p) => p.currency.tokenAddress === c.tokenAddress),
+    );
+    if (availableCurrencies.length === 0) return;
+    setMultiPayments([
+      ...multiPayments,
+      {
+        id: Date.now().toString(),
+        currency: availableCurrencies[0],
+        amount: "",
+        balance: multiBalances[availableCurrencies[0].tokenAddress] || "0",
+      },
+    ]);
+  };
+
+  const removePaymentEntry = (id: string) => {
+    if (multiPayments.length <= 1) return;
+    setMultiPayments(multiPayments.filter((p) => p.id !== id));
+  };
+
+  const updatePaymentEntry = (
+    id: string,
+    field: "currency" | "amount",
+    value: Currency | string,
+  ) => {
+    setMultiPayments(
+      multiPayments.map((p) =>
+        p.id === id
+          ? {
+              ...p,
+              [field]: value,
+              ...(field === "currency" && typeof value !== "string"
+                ? { balance: multiBalances[value.tokenAddress] || "0" }
+                : {}),
+            }
+          : p,
+      ),
+    );
+  };
+
+  // Fetch balances for multi-token mode
+  useEffect(() => {
+    if (!smartAccountAddress || !isMultiMode) return;
+
+    const fetchMultiBalances = async () => {
+      const balances: Record<string, string> = {};
+      for (const currency of currencies) {
+        try {
+          const rawBalance = await publicClient.readContract({
+            address: currency.tokenAddress as `0x${string}`,
+            abi: ERC20_ABI,
+            functionName: "balanceOf",
+            args: [smartAccountAddress],
+          });
+          balances[currency.tokenAddress] = formatUnits(
+            rawBalance as bigint,
+            currency.decimals,
+          );
+        } catch {
+          balances[currency.tokenAddress] = "0";
+        }
+      }
+      setMultiBalances(balances);
+      // Update existing entries with new balances
+      setMultiPayments((prev) =>
+        prev.map((p) => ({
+          ...p,
+          balance: balances[p.currency.tokenAddress] || "0",
+        })),
+      );
+    };
+
+    fetchMultiBalances();
+  }, [smartAccountAddress, isMultiMode, publicClient]);
+
+  // Check multi-token balance sufficiency
+  const hasMultiInsufficientBalance = useMemo(() => {
+    return multiPayments.some((p) => {
+      const amt = parseFloat(p.amount) || 0;
+      const bal = parseFloat(p.balance) || 0;
+      return amt > 0 && amt > bal;
+    });
+  }, [multiPayments]);
+
+  // Calculate total USD value of multi-token payments
+  const multiTotalUsdValue = useMemo(() => {
+    return multiPayments.reduce((sum, p) => {
+      const amt = parseFloat(p.amount) || 0;
+      return sum + toUsdValue(amt, p.currency.symbol);
+    }, 0);
+  }, [multiPayments]);
+
+  // Calculate required USD value (requested amount + 0.3% platform fee + 0.2% swap buffer)
+  const multiUsdNeeded = useMemo(() => {
+    const baseUsd = toUsdValue(
+      requestedAmount,
+      requestedCurrency?.symbol || "USDC",
+    );
+    const platformFee = baseUsd * 0.003; // 0.3%
+    const swapBuffer = baseUsd * 0.002; // 0.2% buffer for swap losses
+    return baseUsd + platformFee + swapBuffer;
+  }, [requestedAmount, requestedCurrency]);
+
+  // Check if multi-payment total covers required amount (hardcoded estimate)
+  const hasMultiInsufficientValue =
+    multiTotalUsdValue > 0 && multiTotalUsdValue < multiUsdNeeded;
+
+  // On-chain verification effect (Optimistic UI: verify in background)
+  useEffect(() => {
+    if (!isMultiMode || !requestedCurrency) return;
+
+    const paymentsWithAmount = multiPayments.filter(
+      (p) => parseFloat(p.amount) > 0,
+    );
+    if (paymentsWithAmount.length === 0) {
+      setOnChainTotalValue(null);
+      setVerificationError(null);
+      return;
+    }
+
+    // Debounce: wait 1 second after user stops typing
+    const timer = setTimeout(async () => {
+      setIsVerifying(true);
+      setVerificationError(null);
+
+      try {
+        let totalInRequestedToken = 0n;
+        const requestedTokenDecimals = requestedCurrency.decimals;
+
+        for (const payment of paymentsWithAmount) {
+          const amountRaw = parseUnits(
+            payment.amount,
+            payment.currency.decimals,
+          );
+
+          if (
+            payment.currency.tokenAddress === requestedCurrency.tokenAddress
+          ) {
+            // Same token, no conversion needed
+            totalInRequestedToken += amountRaw;
+          } else {
+            // Convert via StablecoinRegistry
+            const converted = (await publicClient.readContract({
+              address: STABLECOIN_REGISTRY_ADDRESS,
+              abi: STABLECOIN_REGISTRY_ABI,
+              functionName: "convert",
+              args: [
+                payment.currency.tokenAddress as Address,
+                requestedCurrency.tokenAddress as Address,
+                amountRaw,
+              ],
+            })) as bigint;
+            totalInRequestedToken += converted;
+          }
+        }
+
+        // Convert to number for display
+        const totalNumber = Number(
+          formatUnits(totalInRequestedToken, requestedTokenDecimals),
+        );
+        setOnChainTotalValue(totalNumber);
+      } catch (err) {
+        console.error("On-chain verification error:", err);
+        setVerificationError("Verification failed");
+        setOnChainTotalValue(null);
+      } finally {
+        setIsVerifying(false);
+      }
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [multiPayments, isMultiMode, requestedCurrency, publicClient]);
+
+  // Calculate shortfall in each token used (for user-friendly display)
+  const shortfallOptions = useMemo(() => {
+    if (!requestedCurrency) return [];
+
+    // Calculate shortfall in requested token units
+    const requiredTotal = requestedAmount * 1.005; // Include 0.5% buffer for fees
+    const currentTotal =
+      onChainTotalValue ??
+      multiTotalUsdValue * (TOKEN_RATES[requestedCurrency.symbol] || 1);
+
+    if (currentTotal >= requiredTotal) return [];
+
+    const shortfallInRequested = requiredTotal - currentTotal;
+
+    // Calculate how much of each token used would cover the shortfall
+    return multiPayments
+      .filter((p) => parseFloat(p.amount) > 0)
+      .map((p) => {
+        const rate = TOKEN_RATES[p.currency.symbol] || 1;
+        const requestedRate = TOKEN_RATES[requestedCurrency.symbol] || 1;
+        const shortfallInThisToken =
+          (shortfallInRequested / requestedRate) * rate;
+        return {
+          symbol: p.currency.symbol,
+          amount: shortfallInThisToken,
+        };
+      });
+  }, [
+    multiPayments,
+    onChainTotalValue,
+    multiTotalUsdValue,
+    requestedAmount,
+    requestedCurrency,
+  ]);
+
   const handleSend = async () => {
-    if (!quote || !smartAccountAddress) return;
+    if (!smartAccountAddress) return;
+
+    const request = {
+      recipient: payload.request.recipient as `0x${string}`,
+      requestedToken: payload.request.requestedToken as `0x${string}`,
+      requestedAmount: BigInt(payload.request.requestedAmountRaw),
+      deadline: BigInt(payload.request.deadline),
+      nonce: payload.request.nonce as `0x${string}`,
+      merchantSigner: payload.request.merchantSigner as `0x${string}`,
+    };
 
     try {
-      const slippageBps = 100; // 1% slippage buffer
-      const request = {
-        recipient: payload.request.recipient as `0x${string}`,
-        requestedToken: payload.request.requestedToken as `0x${string}`,
-        requestedAmount: BigInt(payload.request.requestedAmountRaw),
-        deadline: BigInt(payload.request.deadline),
-        nonce: payload.request.nonce as `0x${string}`,
-        merchantSigner: payload.request.merchantSigner as `0x${string}`,
-      };
+      let txHash: string;
 
-      const maxAmountToPay =
-        (quote.totalRequired * BigInt(10000 + slippageBps)) / 10000n;
+      if (isMultiMode) {
+        // Multi-token payment
+        const payments = multiPayments
+          .filter((p) => parseFloat(p.amount) > 0)
+          .map((p) => ({
+            token: p.currency.tokenAddress as Address,
+            amount: parseUnits(p.amount, p.currency.decimals),
+          }));
 
-      const txHash = await payInvoice({
-        request,
-        merchantSignature: payload.signature as `0x${string}`,
-        payToken: payToken.tokenAddress as `0x${string}`,
-        totalRequired: quote.totalRequired,
-        maxAmountToPay,
-        paymentProcessorAddress: processorAddress,
-      });
+        if (payments.length === 0) {
+          throw new Error("Add at least one payment amount");
+        }
 
-      // Show success receipt
-      setReceipt({
-        id: txHash,
-        type: "send",
-        status: "success",
-        timestamp: new Date(),
-        amount: Number(formatUnits(quote.totalRequired, payToken.decimals)),
-        currency: payToken.symbol,
-        currencyIcon: `/icons/${payToken.symbol.toLowerCase()}.svg`,
-        toAddress: payload.request.recipient,
-        txHash: txHash,
-      });
+        txHash = await payMultiTokenInvoice({
+          request,
+          merchantSignature: payload.signature as `0x${string}`,
+          payments,
+          paymentProcessorAddress: processorAddress,
+        });
+
+        setReceipt({
+          id: txHash,
+          type: "send",
+          status: "success",
+          timestamp: new Date(),
+          amount: requestedAmount,
+          currency: requestedCurrency?.symbol || "Token",
+          currencyIcon: requestedCurrency?.icon || "",
+          toAddress: payload.request.recipient,
+          txHash: txHash,
+        });
+      } else {
+        // Single-token payment (original logic)
+        if (!quote) return;
+
+        const slippageBps = 100;
+        const maxAmountToPay =
+          (quote.totalRequired * BigInt(10000 + slippageBps)) / 10000n;
+
+        txHash = await payInvoice({
+          request,
+          merchantSignature: payload.signature as `0x${string}`,
+          payToken: payToken.tokenAddress as `0x${string}`,
+          totalRequired: quote.totalRequired,
+          maxAmountToPay,
+          paymentProcessorAddress: processorAddress,
+        });
+
+        setReceipt({
+          id: txHash,
+          type: "send",
+          status: "success",
+          timestamp: new Date(),
+          amount: Number(formatUnits(quote.totalRequired, payToken.decimals)),
+          currency: payToken.symbol,
+          currencyIcon: `/icons/${payToken.symbol.toLowerCase()}.svg`,
+          toAddress: payload.request.recipient,
+          txHash: txHash,
+        });
+      }
+
       setShowReceipt(true);
     } catch (err) {
       console.error("Payment error:", err);
-      // Show failure receipt
       setReceipt({
         id: Date.now().toString(),
         type: "send",
         status: "failed",
         timestamp: new Date(),
-        amount: Number(formatUnits(quote?.totalRequired || 0n, payToken.decimals)),
-        currency: payToken.symbol,
-        currencyIcon: `/icons/${payToken.symbol.toLowerCase()}.svg`,
+        amount: requestedAmount,
+        currency: requestedCurrency?.symbol || "Token",
+        currencyIcon: requestedCurrency?.icon || "",
         toAddress: payload.request.recipient,
         errorMessage: err instanceof Error ? err.message : "Payment failed",
       });
@@ -250,13 +569,13 @@ export default function TransactionPopup({
       undefined,
       {
         maximumFractionDigits: 6,
-      }
+      },
     );
   };
 
   return (
-    <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50">
-      <div className="w-full max-w-md bg-zinc-800 rounded-2xl p-6 border-2 border-primary">
+    <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 overflow-y-auto">
+      <div className="w-full max-w-md max-h-[90vh] overflow-y-auto bg-zinc-800 rounded-2xl p-6 border-2 border-primary">
         <h2 className="text-white text-xl font-bold text-center mb-6">
           Payment Details
         </h2>
@@ -280,11 +599,199 @@ export default function TransactionPopup({
             </span>
           </div>
 
-          {/* Pay With Currency Selector */}
-          <div className="space-y-2">
-            <span className="text-zinc-400">Pay with</span>
-            <CurrencyDropdown value={payToken} onChange={setPayToken} />
+          {/* Payment Mode Toggle */}
+          <div className="flex items-center justify-between p-3 bg-zinc-700/50 rounded-lg">
+            <span className="text-zinc-300 text-sm">Payment Mode</span>
+            <div className="flex gap-2">
+              <button
+                onClick={() => setIsMultiMode(false)}
+                className={`px-3 py-1 text-sm rounded-lg transition-colors ${
+                  !isMultiMode
+                    ? "bg-primary text-black font-medium"
+                    : "bg-zinc-600 text-zinc-300 hover:bg-zinc-500"
+                }`}
+              >
+                Single
+              </button>
+              <button
+                onClick={() => setIsMultiMode(true)}
+                className={`px-3 py-1 text-sm rounded-lg transition-colors ${
+                  isMultiMode
+                    ? "bg-primary text-black font-medium"
+                    : "bg-zinc-600 text-zinc-300 hover:bg-zinc-500"
+                }`}
+              >
+                Multi
+              </button>
+            </div>
           </div>
+
+          {/* Single Token Mode */}
+          {!isMultiMode && (
+            <div className="space-y-2">
+              <span className="text-zinc-400">Pay with</span>
+              <CurrencyDropdown value={payToken} onChange={setPayToken} />
+            </div>
+          )}
+
+          {/* Multi Token Mode */}
+          {isMultiMode && (
+            <div className="space-y-3">
+              <div className="flex justify-between items-center">
+                <span className="text-zinc-400">Pay with multiple tokens</span>
+                <button
+                  onClick={addPaymentEntry}
+                  disabled={multiPayments.length >= currencies.length}
+                  className="flex items-center gap-1 text-sm text-primary hover:text-primary/80 disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  <Plus className="w-4 h-4" /> Add Token
+                </button>
+              </div>
+
+              {multiPayments.map((entry) => (
+                <div
+                  key={entry.id}
+                  className="flex gap-2 items-center bg-zinc-700/30 p-3 rounded-lg"
+                >
+                  <div className="flex-1">
+                    <CurrencyDropdown
+                      value={entry.currency}
+                      onChange={(c) =>
+                        updatePaymentEntry(entry.id, "currency", c)
+                      }
+                    />
+                  </div>
+                  <input
+                    type="number"
+                    value={entry.amount}
+                    onChange={(e) =>
+                      updatePaymentEntry(entry.id, "amount", e.target.value)
+                    }
+                    placeholder="0"
+                    className="w-28 p-2 bg-zinc-800 border border-zinc-600 rounded-lg text-white text-right focus:outline-none focus:border-primary"
+                  />
+                  {multiPayments.length > 1 && (
+                    <button
+                      onClick={() => removePaymentEntry(entry.id)}
+                      className="p-2 text-red-400 hover:text-red-300"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  )}
+                </div>
+              ))}
+
+              {/* Multi-token balance info */}
+              <div className="text-xs text-zinc-500 space-y-1">
+                {multiPayments.map((entry) => (
+                  <div key={entry.id} className="flex justify-between">
+                    <span>{entry.currency.symbol} Balance:</span>
+                    <span>
+                      {parseFloat(entry.balance).toLocaleString(undefined, {
+                        maximumFractionDigits: 4,
+                      })}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              {/* Hybrid Verification Summary */}
+              {multiPayments.some((p) => parseFloat(p.amount) > 0) && (
+                <div className="p-3 bg-zinc-700/30 rounded-lg space-y-2 mt-2">
+                  {/* Your Total in Requested Token */}
+                  <div className="flex justify-between text-sm">
+                    <span className="text-zinc-400">
+                      Your Total ({requestedCurrency?.symbol})
+                    </span>
+                    <div className="flex items-center gap-2">
+                      {isVerifying ? (
+                        <span className="text-zinc-400 flex items-center gap-1">
+                          <Loader2 className="w-3 h-3 animate-spin" />
+                          Verifying...
+                        </span>
+                      ) : onChainTotalValue !== null ? (
+                        <span className="text-green-400 flex items-center gap-1">
+                          <CheckCircle className="w-3 h-3" />
+                          {onChainTotalValue.toLocaleString(undefined, {
+                            maximumFractionDigits: 6,
+                          })}
+                        </span>
+                      ) : (
+                        <span className="text-zinc-300">
+                          ~
+                          {(
+                            multiTotalUsdValue *
+                            (TOKEN_RATES[requestedCurrency?.symbol || "USDC"] ||
+                              1)
+                          ).toLocaleString(undefined, {
+                            maximumFractionDigits: 4,
+                          })}
+                          <span className="text-zinc-500 text-xs ml-1">
+                            (est)
+                          </span>
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Required Amount */}
+                  <div className="flex justify-between text-sm">
+                    <span className="text-zinc-400">Required (incl. fees)</span>
+                    <span className="text-white font-medium">
+                      {(requestedAmount * 1.005).toLocaleString(undefined, {
+                        maximumFractionDigits: 4,
+                      })}{" "}
+                      {requestedCurrency?.symbol}
+                    </span>
+                  </div>
+
+                  {/* Verification Error */}
+                  {verificationError && (
+                    <div className="text-xs text-orange-400 flex items-center gap-1">
+                      <AlertTriangle className="w-3 h-3" />
+                      {verificationError} - using estimate
+                    </div>
+                  )}
+
+                  {/* Shortfall Warning with Options */}
+                  {shortfallOptions.length > 0 && (
+                    <div className="p-2 bg-orange-500/20 border border-orange-500/50 rounded-lg">
+                      <div className="flex items-center gap-2 text-orange-400 text-sm font-medium mb-1">
+                        <AlertTriangle className="w-4 h-4" />
+                        Need more to complete payment:
+                      </div>
+                      <div className="text-xs text-orange-300 space-y-0.5">
+                        {shortfallOptions.map((opt, idx) => (
+                          <div key={opt.symbol}>
+                            {idx > 0 && (
+                              <span className="text-orange-400/70">or </span>
+                            )}
+                            <span className="font-mono">
+                              +
+                              {opt.amount.toLocaleString(undefined, {
+                                maximumFractionDigits: 4,
+                              })}
+                            </span>
+                            <span className="ml-1">{opt.symbol}</span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Success Indicator */}
+                  {shortfallOptions.length === 0 &&
+                    onChainTotalValue !== null &&
+                    onChainTotalValue >= requestedAmount * 1.005 && (
+                      <div className="flex items-center gap-2 text-green-400 text-sm">
+                        <CheckCircle className="w-4 h-4" />
+                        Sufficient amount ✓
+                      </div>
+                    )}
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="flex justify-between items-center">
             <span className="text-zinc-400">Requested currency</span>
@@ -350,8 +857,8 @@ export default function TransactionPopup({
           </div>
         )}
 
-        {/* Insufficient Balance Warning */}
-        {smartAccountAddress && hasInsufficientBalance && (
+        {/* Insufficient Balance Warning - Single Mode */}
+        {smartAccountAddress && !isMultiMode && hasInsufficientBalance && (
           <div className="mt-4 flex items-center gap-2 p-3 bg-orange-500/20 border border-orange-500 rounded-lg text-orange-400 text-sm">
             <AlertTriangle className="w-4 h-4 shrink-0" />
             <span>
@@ -364,15 +871,23 @@ export default function TransactionPopup({
           </div>
         )}
 
-        {/* Balance Info */}
-        {smartAccountAddress && !hasNoBalance && quote && (
+        {/* Insufficient Balance Warning - Multi Mode */}
+        {smartAccountAddress && isMultiMode && hasMultiInsufficientBalance && (
+          <div className="mt-4 flex items-center gap-2 p-3 bg-orange-500/20 border border-orange-500 rounded-lg text-orange-400 text-sm">
+            <AlertTriangle className="w-4 h-4 shrink-0" />
+            <span>Insufficient balance for one or more tokens</span>
+          </div>
+        )}
+
+        {/* Balance Info - Single Mode */}
+        {smartAccountAddress && !isMultiMode && !hasNoBalance && quote && (
           <div className="mt-2 text-xs text-zinc-400 text-right">
             Balance:{" "}
             {isLoadingBalance
               ? "..."
               : numBalance.toLocaleString(undefined, {
-                maximumFractionDigits: 4,
-              })}{" "}
+                  maximumFractionDigits: 4,
+                })}{" "}
             {payToken.symbol}
           </div>
         )}
@@ -382,18 +897,27 @@ export default function TransactionPopup({
             onClick={handleSend}
             disabled={
               !smartAccountAddress ||
-              !quote ||
               isLoading ||
               isLoadingQuote ||
-              hasInsufficientBalance
+              (isMultiMode
+                ? hasMultiInsufficientBalance ||
+                  hasMultiInsufficientValue ||
+                  multiPayments.every((p) => !parseFloat(p.amount))
+                : !quote || hasInsufficientBalance)
             }
             className="w-full py-4 bg-primary text-black font-bold text-xl rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLoading
               ? "PROCESSING..."
-              : hasInsufficientBalance
-                ? "INSUFFICIENT BALANCE"
-                : "PAY NOW"}
+              : (
+                    isMultiMode
+                      ? hasMultiInsufficientBalance || hasMultiInsufficientValue
+                      : hasInsufficientBalance
+                  )
+                ? "INSUFFICIENT AMOUNT"
+                : isMultiMode
+                  ? "PAY WITH MULTI-TOKEN"
+                  : "PAY NOW"}
           </button>
           <button
             onClick={onCancel}
