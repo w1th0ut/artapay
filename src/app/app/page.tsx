@@ -33,7 +33,8 @@ export default function Start() {
   const [activeMenu, setActiveMenu] = useState<MenuType>("send");
   const [isHydrated, setIsHydrated] = useState(false);
 
-  const { smartAccountAddress, approvePaymaster } = useSmartAccount();
+  const { smartAccountAddress, approvePaymaster, activationApproveSpender } =
+    useSmartAccount();
   const { isApproved, isChecking, ethBalance, refresh } =
     useApprovalStatus(smartAccountAddress);
 
@@ -113,6 +114,7 @@ export default function Start() {
           ethBalance={ethBalance}
           onActivate={handleActivate}
           smartAccountAddress={smartAccountAddress}
+          approvalSpender={activationApproveSpender}
         />
       )}
     </div>

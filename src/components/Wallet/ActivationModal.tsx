@@ -12,22 +12,24 @@ import {
 import { formatEther, parseEther, type Address } from "viem";
 import { usePrivy } from "@privy-io/react-auth";
 import { useSmartAccount } from "@/hooks/useSmartAccount";
-import { TOKENS } from "@/config/constants";
+import { PAYMASTER_ADDRESS, TOKENS } from "@/config/constants";
 import Modal from "@/components/Modal";
 
 // Minimum ETH required for activation (in ETH)
-const MIN_ETH_REQUIRED = parseEther("0.00001");
+const MIN_ETH_REQUIRED = parseEther("0");
 
 interface ActivationModalProps {
   ethBalance: bigint;
   onActivate: () => Promise<void>;
   smartAccountAddress: Address;
+  approvalSpender?: Address | null;
 }
 
 export default function ActivationModal({
   ethBalance,
   onActivate,
   smartAccountAddress,
+  approvalSpender,
 }: ActivationModalProps) {
   const [isActivating, setIsActivating] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -122,8 +124,8 @@ export default function ActivationModal({
                 Pay Once, Free Forever
               </h3>
               <p className="text-zinc-400 text-xs mt-1">
-                Small ETH fee for this setup, then all future transactions are
-                gasless
+                Activation is sponsored by paymaster, then all future
+                transactions are gasless
               </p>
             </div>
           </div>
@@ -146,41 +148,55 @@ export default function ActivationModal({
             </span>
           </div>
 
-          {!hasEnoughETH && (
-            <div className="mt-3 space-y-3">
+          <div className="mt-3 space-y-3">
+            {!hasEnoughETH && (
               <p className="text-orange-300 text-xs">
                 You need at least{" "}
                 <span className="font-bold">{minEthFormatted} ETH</span> to
                 activate your account. Send ETH to your Smart Account:
               </p>
-              <div className="bg-zinc-800 rounded-lg p-3">
-                <div className="flex items-center justify-between gap-2">
-                  <code className="text-white text-xs font-mono break-all flex-1">
-                    {smartAccountAddress}
-                  </code>
-                  <button
-                    onClick={handleCopyAddress}
-                    className="p-2 hover:bg-zinc-700 rounded-lg transition-colors shrink-0"
-                  >
-                    {copied ? (
-                      <Check className="w-4 h-4 text-green-400" />
-                    ) : (
-                      <Copy className="w-4 h-4 text-zinc-400" />
-                    )}
-                  </button>
-                </div>
+            )}
+            <div className="bg-zinc-800 rounded-lg p-3">
+              <div className="flex items-center justify-between gap-2">
+                <code className="text-white text-xs font-mono break-all flex-1">
+                  {smartAccountAddress}
+                </code>
+                <button
+                  onClick={handleCopyAddress}
+                  className="p-2 hover:bg-zinc-700 rounded-lg transition-colors shrink-0"
+                >
+                  {copied ? (
+                    <Check className="w-4 h-4 text-green-400" />
+                  ) : (
+                    <Copy className="w-4 h-4 text-zinc-400" />
+                  )}
+                </button>
               </div>
-              <a
-                href={`https://base-sepolia.blockscout.com/address/${smartAccountAddress}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="flex items-center gap-2 text-primary text-xs hover:underline"
-              >
-                View on Explorer
-                <ExternalLink className="w-3 h-3" />
-              </a>
             </div>
-          )}
+            <a
+              href={`https://base-sepolia.blockscout.com/address/${smartAccountAddress}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center gap-2 text-primary text-xs hover:underline"
+            >
+              View on Explorer
+              <ExternalLink className="w-3 h-3" />
+            </a>
+            <div className="text-xs text-zinc-400">
+              Paymaster:{" "}
+              <span className="font-mono text-zinc-300">
+                {PAYMASTER_ADDRESS}
+              </span>
+            </div>
+            {approvalSpender && (
+              <div className="text-xs text-zinc-400">
+                Approve spender:{" "}
+                <span className="font-mono text-zinc-300">
+                  {approvalSpender}
+                </span>
+              </div>
+            )}
+          </div>
         </div>
 
         {/* Status Message */}

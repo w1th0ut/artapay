@@ -7,6 +7,7 @@ export interface SignPaymasterRequest {
   tokenAddress: string;
   validUntil?: number;
   validAfter?: number;
+  isActivation?: boolean;
 }
 
 export interface SignPaymasterResponse {
@@ -26,6 +27,7 @@ export async function getPaymasterSignature(
         tokenAddress: params.tokenAddress,
         validUntil: params.validUntil ?? Math.floor(Date.now() / 1000) + 3600,
         validAfter: params.validAfter ?? 0,
+        isActivation: params.isActivation ?? false,
       }),
     });
   } catch (err) {

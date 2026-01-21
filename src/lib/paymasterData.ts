@@ -6,6 +6,7 @@ export interface PaymasterDataParams {
   validUntil: number;
   validAfter: number;
   hasPermit: boolean;
+  isActivation: boolean;
   permitDeadline?: bigint;
   permitV?: number;
   permitR?: `0x${string}`;
@@ -20,6 +21,7 @@ export function buildPaymasterData(params: PaymasterDataParams): `0x${string}` {
     validUntil,
     validAfter,
     hasPermit,
+    isActivation,
     permitDeadline,
     permitV,
     permitR,
@@ -39,6 +41,7 @@ export function buildPaymasterData(params: PaymasterDataParams): `0x${string}` {
         "uint48",
         "uint48",
         "uint8",
+        "uint8",
         "uint256",
         "uint8",
         "bytes32",
@@ -51,6 +54,7 @@ export function buildPaymasterData(params: PaymasterDataParams): `0x${string}` {
         validUntil,
         validAfter,
         1,
+        isActivation ? 1 : 0,
         permitDeadline,
         permitV,
         permitR,
@@ -61,8 +65,8 @@ export function buildPaymasterData(params: PaymasterDataParams): `0x${string}` {
   }
 
   return encodePacked(
-    ["address", "address", "uint48", "uint48", "uint8", "bytes"],
-    [tokenAddress, payerAddress, validUntil, validAfter, 0, signature]
+    ["address", "address", "uint48", "uint48", "uint8", "uint8", "bytes"],
+    [tokenAddress, payerAddress, validUntil, validAfter, 0, isActivation ? 1 : 0, signature]
   );
 }
 

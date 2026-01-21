@@ -11,6 +11,7 @@ import {
   http,
   type Address,
   encodeFunctionData,
+  decodeFunctionData,
   maxUint256,
   parseUnits,
 } from "viem";
@@ -63,6 +64,9 @@ export function useSmartAccount() {
   const [isLoading, setIsLoading] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true); // Track initial loading
   const [error, setError] = useState<string | null>(null);
+  const [activationApproveSpender, setActivationApproveSpender] = useState<
+    Address | null
+  >(null);
   const [client, setClient] = useState<ReturnType<
     typeof createSmartAccountClient
   > | null>(null);
@@ -333,16 +337,51 @@ export function useSmartAccount() {
         const { client, address } = await ensureClient();
         const feeParams = await getFeeParams();
 
-        const calls = tokenAddresses.map((token) => {
+        const activationToken = tokenAddresses[0];
+        const validUntil = Math.floor(Date.now() / 1000) + 3600;
+        const validAfter = 0;
+
+        setStatus("Requesting activation signature...");
+        const signature = await getPaymasterSignature({
+          payerAddress: address,
+          tokenAddress: activationToken,
+          validUntil,
+          validAfter,
+          isActivation: true,
+        });
+
+        const paymasterData = buildPaymasterData({
+          tokenAddress: activationToken,
+          payerAddress: address,
+          validUntil,
+          validAfter,
+          hasPermit: false,
+          isActivation: true,
+          signature: signature as `0x${string}`,
+        });
+
+        const calls = tokenAddresses.map((token, index) => {
           const approveData = encodeFunctionData({
             abi: ERC20_ABI,
             functionName: "approve",
             args: [PAYMASTER_ADDRESS, maxUint256],
           });
+          if (index === 0) {
+            try {
+              const decoded = decodeFunctionData({
+                abi: ERC20_ABI,
+                data: approveData,
+              }) as { args?: readonly unknown[] };
+              const spender = decoded?.args?.[0] as Address | undefined;
+              setActivationApproveSpender(spender ?? null);
+            } catch {
+              setActivationApproveSpender(null);
+            }
+          }
           return { to: token, data: approveData, value: BigInt(0) };
         });
 
-        setStatus("Sending approve (SA pays native gas)...");
+        setStatus("Submitting activation (paymaster sponsored)...");
         const baseCallGas = 120_000;
         const perApproveGas = 70_000;
         const callGasLimit = BigInt(
@@ -353,15 +392,25 @@ export function useSmartAccount() {
 
         const res = await client.sendCalls({
           calls,
+          paymaster: PAYMASTER_ADDRESS,
+          paymasterData,
+          paymasterVerificationGasLimit: BigInt(250_000),
+          paymasterPostOpGasLimit: BigInt(200_000),
           callGasLimit,
           verificationGasLimit,
           preVerificationGas,
           ...feeParams,
         });
-        const txHash = res.id as `0x${string}`;
+        const userOpHash = res.id as `0x${string}`;
 
-        setStatus("Approve submitted");
-        return { txHash, sender: address };
+        setStatus("Activation submitted, waiting for execution...");
+        const receipt = await waitForUserOp(userOpHash);
+        if (!receipt.success) {
+          const reason = receipt.reason || "Activation failed";
+          throw new Error(reason);
+        }
+        setStatus("Activation executed on-chain");
+        return { txHash: receipt.txHash || userOpHash, sender: address };
       } catch (err) {
         const message = transformError(err);
         setError(message);
@@ -371,7 +420,7 @@ export function useSmartAccount() {
         setIsLoading(false);
       }
     },
-    [ensureClient, getFeeParams],
+    [ensureClient, getFeeParams, waitForUserOp],
   );
 
   const claimFaucet = useCallback(
@@ -432,6 +481,7 @@ export function useSmartAccount() {
           tokenAddress: params.tokenAddress,
           validUntil,
           validAfter,
+          isActivation: false,
         });
 
         const paymasterData = buildPaymasterData({
@@ -440,6 +490,7 @@ export function useSmartAccount() {
           validUntil,
           validAfter,
           hasPermit: false,
+          isActivation: false,
           signature: signature as `0x${string}`,
         });
 
@@ -524,6 +575,7 @@ export function useSmartAccount() {
           tokenAddress: params.tokenAddress,
           validUntil,
           validAfter,
+          isActivation: false,
         });
 
         const paymasterData = buildPaymasterData({
@@ -532,6 +584,7 @@ export function useSmartAccount() {
           validUntil,
           validAfter,
           hasPermit: false,
+          isActivation: false,
           signature: signature as `0x${string}`,
         });
 
@@ -633,6 +686,7 @@ export function useSmartAccount() {
           tokenAddress: params.tokenIn,
           validUntil,
           validAfter,
+          isActivation: false,
         });
 
         const paymasterData = buildPaymasterData({
@@ -641,6 +695,7 @@ export function useSmartAccount() {
           validUntil,
           validAfter,
           hasPermit: false,
+          isActivation: false,
           signature: signature as `0x${string}`,
         });
 
@@ -738,6 +793,7 @@ export function useSmartAccount() {
           tokenAddress: params.payToken,
           validUntil,
           validAfter,
+          isActivation: false,
         });
 
         const paymasterData = buildPaymasterData({
@@ -746,6 +802,7 @@ export function useSmartAccount() {
           validUntil,
           validAfter,
           hasPermit: false,
+          isActivation: false,
           signature: signature as `0x${string}`,
         });
 
@@ -855,6 +912,7 @@ export function useSmartAccount() {
           tokenAddress: feeToken,
           validUntil,
           validAfter,
+          isActivation: false,
         });
 
         const paymasterData = buildPaymasterData({
@@ -863,6 +921,7 @@ export function useSmartAccount() {
           validUntil,
           validAfter,
           hasPermit: false,
+          isActivation: false,
           signature: signature as `0x${string}`,
         });
 
@@ -965,6 +1024,7 @@ export function useSmartAccount() {
     isLoading,
     isReady,
     error,
+    activationApproveSpender,
     sendGaslessTransfer,
     sendBatchTransfer,
     approvePaymaster,
