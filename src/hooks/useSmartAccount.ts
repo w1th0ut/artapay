@@ -11,7 +11,6 @@ import {
   http,
   type Address,
   encodeFunctionData,
-  decodeFunctionData,
   maxUint256,
   parseUnits,
 } from "viem";
@@ -64,9 +63,6 @@ export function useSmartAccount() {
   const [isLoading, setIsLoading] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true); // Track initial loading
   const [error, setError] = useState<string | null>(null);
-  const [activationApproveSpender, setActivationApproveSpender] = useState<
-    Address | null
-  >(null);
   const [client, setClient] = useState<ReturnType<
     typeof createSmartAccountClient
   > | null>(null);
@@ -366,18 +362,6 @@ export function useSmartAccount() {
             functionName: "approve",
             args: [PAYMASTER_ADDRESS, maxUint256],
           });
-          if (index === 0) {
-            try {
-              const decoded = decodeFunctionData({
-                abi: ERC20_ABI,
-                data: approveData,
-              }) as { args?: readonly unknown[] };
-              const spender = decoded?.args?.[0] as Address | undefined;
-              setActivationApproveSpender(spender ?? null);
-            } catch {
-              setActivationApproveSpender(null);
-            }
-          }
           return { to: token, data: approveData, value: BigInt(0) };
         });
 
@@ -437,16 +421,54 @@ export function useSmartAccount() {
           args: [BigInt(params.amount)],
         });
 
-        setStatus("Requesting USDC faucet...");
-        const txHash = await client.sendTransaction({
-          to: params.tokenAddress,
-          data: faucetData,
-          value: BigInt(0),
+        setStatus("Requesting paymaster signature for faucet...");
+        const validUntil = Math.floor(Date.now() / 1000) + 3600;
+        const validAfter = 0;
+        const signature = await getPaymasterSignature({
+          payerAddress: address,
+          tokenAddress: params.tokenAddress,
+          validUntil,
+          validAfter,
+          isActivation: false,
+        });
+
+        const paymasterData = buildPaymasterData({
+          tokenAddress: params.tokenAddress,
+          payerAddress: address,
+          validUntil,
+          validAfter,
+          hasPermit: false,
+          isActivation: false,
+          signature: signature as `0x${string}`,
+        });
+
+        setStatus("Submitting faucet UserOperation...");
+        const res = await client.sendCalls({
+          calls: [
+            {
+              to: params.tokenAddress,
+              data: faucetData,
+              value: BigInt(0),
+            },
+          ],
+          paymaster: PAYMASTER_ADDRESS,
+          paymasterData,
+          paymasterVerificationGasLimit: BigInt(200_000),
+          paymasterPostOpGasLimit: BigInt(200_000),
+          callGasLimit: BigInt(220_000),
+          verificationGasLimit: BigInt(450_000),
           ...feeParams,
         });
 
-        setStatus("Faucet transaction submitted");
-        return { txHash, sender: address };
+        const userOpHash = res.id as `0x${string}`;
+        setStatus("Faucet submitted, waiting for execution...");
+        const receipt = await waitForUserOp(userOpHash);
+        if (!receipt.success) {
+          const reason = receipt.reason || "Faucet failed";
+          throw new Error(reason);
+        }
+        setStatus("Faucet executed on-chain");
+        return { txHash: receipt.txHash || userOpHash, sender: address };
       } catch (err) {
         const message = transformError(err);
         setError(message);
@@ -456,7 +478,7 @@ export function useSmartAccount() {
         setIsLoading(false);
       }
     },
-    [ensureClient, getFeeParams],
+    [ensureClient, getFeeParams, waitForUserOp],
   );
 
   const sendGaslessTransfer = useCallback(
@@ -1024,7 +1046,6 @@ export function useSmartAccount() {
     isLoading,
     isReady,
     error,
-    activationApproveSpender,
     sendGaslessTransfer,
     sendBatchTransfer,
     approvePaymaster,

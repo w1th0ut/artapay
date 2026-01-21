@@ -1,39 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import {
-  AlertCircle,
-  Loader2,
-  Copy,
-  Check,
-  ExternalLink,
-  LogOut,
-} from "lucide-react";
-import { formatEther, parseEther, type Address } from "viem";
+import { AlertCircle, Loader2, LogOut } from "lucide-react";
 import { usePrivy } from "@privy-io/react-auth";
 import { useSmartAccount } from "@/hooks/useSmartAccount";
-import { PAYMASTER_ADDRESS, TOKENS } from "@/config/constants";
+import { TOKENS } from "@/config/constants";
 import Modal from "@/components/Modal";
 
-// Minimum ETH required for activation (in ETH)
-const MIN_ETH_REQUIRED = parseEther("0");
-
 interface ActivationModalProps {
-  ethBalance: bigint;
   onActivate: () => Promise<void>;
-  smartAccountAddress: Address;
-  approvalSpender?: Address | null;
 }
 
 export default function ActivationModal({
-  ethBalance,
   onActivate,
-  smartAccountAddress,
-  approvalSpender,
 }: ActivationModalProps) {
   const [isActivating, setIsActivating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [copied, setCopied] = useState(false);
   const { status } = useSmartAccount();
   const { logout } = usePrivy();
 
@@ -44,10 +26,6 @@ export default function ActivationModal({
     message: string;
     onRetry?: () => void;
   }>({ isOpen: false, title: "", message: "" });
-
-  const hasEnoughETH = ethBalance >= MIN_ETH_REQUIRED;
-  const ethBalanceFormatted = formatEther(ethBalance);
-  const minEthFormatted = formatEther(MIN_ETH_REQUIRED);
 
   const handleActivate = async () => {
     setIsActivating(true);
@@ -65,16 +43,6 @@ export default function ActivationModal({
       });
     } finally {
       setIsActivating(false);
-    }
-  };
-
-  const handleCopyAddress = async () => {
-    try {
-      await navigator.clipboard.writeText(smartAccountAddress);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch (err) {
-      console.error("Failed to copy", err);
     }
   };
 
@@ -131,73 +99,6 @@ export default function ActivationModal({
           </div>
         </div>
 
-        {/* ETH Balance Check */}
-        <div
-          className={`rounded-lg p-4 border ${hasEnoughETH
-            ? "bg-green-500/10 border-green-500"
-            : "bg-orange-500/10 border-orange-500"
-            }`}
-        >
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-sm font-medium text-white">ETH Balance</span>
-            <span
-              className={`text-lg font-bold ${hasEnoughETH ? "text-green-400" : "text-orange-400"
-                }`}
-            >
-              {parseFloat(ethBalanceFormatted).toFixed(6)} ETH
-            </span>
-          </div>
-
-          <div className="mt-3 space-y-3">
-            {!hasEnoughETH && (
-              <p className="text-orange-300 text-xs">
-                You need at least{" "}
-                <span className="font-bold">{minEthFormatted} ETH</span> to
-                activate your account. Send ETH to your Smart Account:
-              </p>
-            )}
-            <div className="bg-zinc-800 rounded-lg p-3">
-              <div className="flex items-center justify-between gap-2">
-                <code className="text-white text-xs font-mono break-all flex-1">
-                  {smartAccountAddress}
-                </code>
-                <button
-                  onClick={handleCopyAddress}
-                  className="p-2 hover:bg-zinc-700 rounded-lg transition-colors shrink-0"
-                >
-                  {copied ? (
-                    <Check className="w-4 h-4 text-green-400" />
-                  ) : (
-                    <Copy className="w-4 h-4 text-zinc-400" />
-                  )}
-                </button>
-              </div>
-            </div>
-            <a
-              href={`https://base-sepolia.blockscout.com/address/${smartAccountAddress}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="flex items-center gap-2 text-primary text-xs hover:underline"
-            >
-              View on Explorer
-              <ExternalLink className="w-3 h-3" />
-            </a>
-            <div className="text-xs text-zinc-400">
-              Paymaster:{" "}
-              <span className="font-mono text-zinc-300">
-                {PAYMASTER_ADDRESS}
-              </span>
-            </div>
-            {approvalSpender && (
-              <div className="text-xs text-zinc-400">
-                Approve spender:{" "}
-                <span className="font-mono text-zinc-300">
-                  {approvalSpender}
-                </span>
-              </div>
-            )}
-          </div>
-        </div>
 
         {/* Status Message */}
         {isActivating && status && (
@@ -217,7 +118,7 @@ export default function ActivationModal({
         {/* Activate Button */}
         <button
           onClick={handleActivate}
-          disabled={!hasEnoughETH || isActivating}
+          disabled={isActivating}
           className="w-full py-3 sm:py-4 bg-primary text-black font-bold text-lg sm:text-xl rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isActivating ? (
@@ -225,8 +126,6 @@ export default function ActivationModal({
               <Loader2 className="w-5 h-5 animate-spin" />
               ACTIVATING...
             </span>
-          ) : !hasEnoughETH ? (
-            "DEPOSIT ETH FIRST"
           ) : (
             "ACTIVATE ACCOUNT"
           )}

@@ -33,10 +33,10 @@ export default function Start() {
   const [activeMenu, setActiveMenu] = useState<MenuType>("send");
   const [isHydrated, setIsHydrated] = useState(false);
 
-  const { smartAccountAddress, approvePaymaster, activationApproveSpender } =
-    useSmartAccount();
-  const { isApproved, isChecking, ethBalance, refresh } =
-    useApprovalStatus(smartAccountAddress);
+  const { smartAccountAddress, approvePaymaster } = useSmartAccount();
+  const { isApproved, isChecking, refresh } = useApprovalStatus(
+    smartAccountAddress
+  );
 
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -111,10 +111,7 @@ export default function Start() {
       {/* Activation Modal - Cannot be closed */}
       {showActivationModal && smartAccountAddress && (
         <ActivationModal
-          ethBalance={ethBalance}
           onActivate={handleActivate}
-          smartAccountAddress={smartAccountAddress}
-          approvalSpender={activationApproveSpender}
         />
       )}
     </div>
