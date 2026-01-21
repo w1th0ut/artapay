@@ -485,6 +485,113 @@ export function useSmartAccount() {
     [ensureClient, getFeeParams, waitForUserOp],
   );
 
+  const sendBatchTransfer = useCallback(
+    async (params: {
+      recipients: { address: Address; amount: string }[];
+      tokenAddress: Address;
+      decimals: number;
+    }) => {
+      setError(null);
+      setIsLoading(true);
+      try {
+        if (params.recipients.length === 0) {
+          throw new Error("At least one recipient is required");
+        }
+        if (params.recipients.length > 20) {
+          throw new Error("Maximum 20 recipients per batch");
+        }
+
+        const { client, address } = await ensureClient();
+        const feeParams = await getFeeParams();
+
+        setStatus("Requesting paymaster signature for batch transfer...");
+        const validUntil = Math.floor(Date.now() / 1000) + 3600;
+        const validAfter = 0;
+        const signature = await getPaymasterSignature({
+          payerAddress: address,
+          tokenAddress: params.tokenAddress,
+          validUntil,
+          validAfter,
+        });
+
+        const paymasterData = buildPaymasterData({
+          tokenAddress: params.tokenAddress,
+          payerAddress: address,
+          validUntil,
+          validAfter,
+          hasPermit: false,
+          signature: signature as `0x${string}`,
+        });
+
+        // Build transfer calls for each recipient
+        const calls = params.recipients.map((recipient) => ({
+          to: params.tokenAddress,
+          data: encodeFunctionData({
+            abi: ERC20_ABI,
+            functionName: "transfer",
+            args: [
+              recipient.address,
+              parseUnits(recipient.amount, params.decimals),
+            ],
+          }),
+          value: BigInt(0),
+        }));
+
+        // Dynamic gas limits based on recipient count
+        const recipientCount = params.recipients.length;
+        const baseCallGas = 100_000;
+        const perTransferGas = 50_000;
+        const callGasLimit = BigInt(
+          baseCallGas + recipientCount * perTransferGas,
+        );
+
+        setStatus(`Sending batch transfer to ${recipientCount} recipients...`);
+        let userOpHash = "";
+        try {
+          const res = await client.sendCalls({
+            calls,
+            paymaster: PAYMASTER_ADDRESS,
+            paymasterData,
+            paymasterVerificationGasLimit: BigInt(200_000),
+            paymasterPostOpGasLimit: BigInt(200_000),
+            callGasLimit,
+            verificationGasLimit: BigInt(450_000),
+            ...feeParams,
+          });
+          userOpHash = res.id as `0x${string}`;
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : "send failed";
+          if (msg.includes("Failed to fetch")) {
+            throw new Error(
+              `Bundler RPC unreachable at ${GELATO_BUNDLER_URL} (${msg})`,
+            );
+          }
+          throw err;
+        }
+
+        setStatus("Batch transfer submitted, waiting for execution...");
+        const receipt = await waitForUserOp(userOpHash as `0x${string}`);
+        if (!receipt.success) {
+          const reason = receipt.reason || "Batch execution failed";
+          throw new Error(reason);
+        }
+        setStatus(`Batch transfer to ${recipientCount} recipients completed`);
+        return {
+          txHash: receipt.txHash || userOpHash,
+          recipientCount,
+        };
+      } catch (err) {
+        const message = transformError(err);
+        setError(message);
+        setStatus(message);
+        throw new Error(message);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [ensureClient, getFeeParams, waitForUserOp],
+  );
+
   const swapTokens = useCallback(
     async (params: {
       tokenIn: Address;
@@ -847,6 +954,7 @@ export function useSmartAccount() {
     isReady,
     error,
     sendGaslessTransfer,
+    sendBatchTransfer,
     approvePaymaster,
     claimFaucet,
     initSmartAccount: ensureClient,
