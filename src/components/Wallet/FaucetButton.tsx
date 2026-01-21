@@ -4,14 +4,14 @@ import { useCallback, useEffect, useState } from "react";
 import { Droplet, Loader2 } from "lucide-react";
 import { createPublicClient, http, type Address } from "viem";
 import { useSmartAccount } from "@/hooks/useSmartAccount";
-import { LISK_SEPOLIA } from "@/config/chains";
+import { BASE_SEPOLIA } from "@/config/chains";
 import { env } from "@/config/env";
 import { FAUCET_ABI } from "@/config/abi";
 import Modal from "@/components/Modal";
 
 const publicClient = createPublicClient({
-  chain: LISK_SEPOLIA,
-  transport: http(LISK_SEPOLIA.rpcUrls.default.http[0]),
+  chain: BASE_SEPOLIA,
+  transport: http(BASE_SEPOLIA.rpcUrls.default.http[0]),
 });
 
 const FAUCET_AMOUNT = 10;

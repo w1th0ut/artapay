@@ -16,7 +16,7 @@ import {
 } from "viem";
 import { createSmartAccountClient } from "permissionless";
 import { toSimpleSmartAccount } from "permissionless/accounts";
-import { LISK_SEPOLIA } from "@/config/chains";
+import { BASE_SEPOLIA } from "@/config/chains";
 import {
   ENTRY_POINT_ADDRESS,
   GELATO_BUNDLER_URL,
@@ -106,7 +106,7 @@ export function useSmartAccount() {
         const createClientAny = createWalletClient as any;
         const privyWalletClient = createClientAny({
           account,
-          chain: LISK_SEPOLIA,
+          chain: BASE_SEPOLIA,
           transport: custom(provider),
         });
         if (cancelled) return;
@@ -160,8 +160,8 @@ export function useSmartAccount() {
         setStatus("Auto-initializing Smart Account...");
         const simpleAccount = await toSimpleSmartAccount({
           client: createPublicClient({
-            chain: LISK_SEPOLIA,
-            transport: http(LISK_SEPOLIA.rpcUrls.default.http[0]),
+            chain: BASE_SEPOLIA,
+            transport: http(BASE_SEPOLIA.rpcUrls.default.http[0]),
           }),
           owner: effectiveWalletClient,
           entryPoint: { address: ENTRY_POINT_ADDRESS, version: "0.7" as const },
@@ -172,7 +172,7 @@ export function useSmartAccount() {
 
         const smartAccountClient = createSmartAccountClient({
           account: simpleAccount,
-          chain: LISK_SEPOLIA,
+          chain: BASE_SEPOLIA,
           bundlerTransport: http(GELATO_BUNDLER_URL),
         });
 
@@ -197,8 +197,8 @@ export function useSmartAccount() {
   const publicClient = useMemo(
     () =>
       createPublicClient({
-        chain: LISK_SEPOLIA,
-        transport: http(LISK_SEPOLIA.rpcUrls.default.http[0]),
+        chain: BASE_SEPOLIA,
+        transport: http(BASE_SEPOLIA.rpcUrls.default.http[0]),
       }),
     [],
   );
@@ -206,7 +206,7 @@ export function useSmartAccount() {
   const bundlerClient = useMemo(
     () =>
       createPublicClient({
-        chain: LISK_SEPOLIA,
+        chain: BASE_SEPOLIA,
         transport: http(GELATO_BUNDLER_URL),
       }),
     [],
@@ -310,7 +310,7 @@ export function useSmartAccount() {
 
     const smartAccountClient = createSmartAccountClient({
       account: simpleAccount,
-      chain: LISK_SEPOLIA,
+      chain: BASE_SEPOLIA,
       bundlerTransport: http(GELATO_BUNDLER_URL),
     });
 
@@ -343,10 +343,22 @@ export function useSmartAccount() {
         });
 
         setStatus("Sending approve (SA pays native gas)...");
-        const txHash = await client.sendTransaction({
+        const baseCallGas = 120_000;
+        const perApproveGas = 70_000;
+        const callGasLimit = BigInt(
+          baseCallGas + tokenAddresses.length * perApproveGas,
+        );
+        const verificationGasLimit = BigInt(1_500_000);
+        const preVerificationGas = BigInt(150_000);
+
+        const res = await client.sendCalls({
           calls,
+          callGasLimit,
+          verificationGasLimit,
+          preVerificationGas,
           ...feeParams,
         });
+        const txHash = res.id as `0x${string}`;
 
         setStatus("Approve submitted");
         return { txHash, sender: address };

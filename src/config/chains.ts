@@ -1,6 +1,6 @@
 import { env } from "./env";
 
-export const LISK_SEPOLIA = {
+export const BASE_SEPOLIA = {
   id: env.chainId,
   name: env.chainName,
   nativeCurrency: {

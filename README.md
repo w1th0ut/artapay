@@ -1,5 +1,5 @@
 # ArtaPay Frontend
-Frontend web app for the ArtaPay dApp built with Next.js that provides wallet onboarding, QR payments, swaps, and activity views for Lisk Sepolia.
+Frontend web app for the ArtaPay dApp built with Next.js that provides wallet onboarding, QR payments, swaps, and activity views for Base Sepolia.
 
 ## Overview
 ArtaPay Frontend provides:
@@ -80,11 +80,11 @@ Create a `.env` file in the root directory:
 # =====================================================
 
 # Network
-NEXT_PUBLIC_CHAIN_ID=4202
-NEXT_PUBLIC_CHAIN_NAME=Lisk Sepolia
-NEXT_PUBLIC_RPC_URL=https://rpc.sepolia-api.lisk.com
+NEXT_PUBLIC_CHAIN_ID=84532
+NEXT_PUBLIC_CHAIN_NAME=Base Sepolia
+NEXT_PUBLIC_RPC_URL=https://sepolia.base.org
 NEXT_PUBLIC_BLOCK_EXPLORER_NAME=Blockscout
-NEXT_PUBLIC_BLOCK_EXPLORER_URL=https://sepolia-blockscout.lisk.com
+NEXT_PUBLIC_BLOCK_EXPLORER_URL=https://base-sepolia.blockscout.com
 NEXT_PUBLIC_NATIVE_CURRENCY_NAME=Ether
 NEXT_PUBLIC_NATIVE_CURRENCY_SYMBOL=ETH
 NEXT_PUBLIC_NATIVE_CURRENCY_DECIMALS=18
@@ -135,27 +135,29 @@ npm run start
 ```
 
 ## Network Information
-### Lisk Sepolia Testnet
+### Base Sepolia Testnet
 
-- **Chain ID**: 4202
-- **RPC URL**: https://rpc.sepolia-api.lisk.com
-- **Block Explorer**: https://sepolia-blockscout.lisk.com
+- **Chain ID**: 84532
+- **RPC URL**: https://sepolia.base.org
+- **Block Explorer**: https://base-sepolia.blockscout.com
 - **EntryPoint v0.7**: `0x0000000071727De22E5E9d8BAf0edAc6f37da032`
 
 ## Supported Stablecoins
 
 | Symbol | Name               | Decimals | Region |
 | ------ | ------------------ | -------- | ------ |
-| USDC   | USD Coin           | 6        | US     |
-| USDT   | Tether USD         | 6        | US     |
-| IDRX   | Indonesia Rupiah   | 6        | ID     |
-| JPYC   | JPY Coin           | 8        | JP     |
-| EURC   | Euro Coin          | 6        | EU     |
-| MXNT   | Mexican Peso Token | 6        | MX     |
-| CNHT   | Chinese Yuan Token | 6        | CN     |
+| USDC   | USD Coin          | 6        | US     |
+| USDS   | Sky Dollar        | 6        | US     |
+| EURC   | Euro Coin         | 6        | EU     |
+| BRZ    | Brazilian Digital | 6        | BR     |
+| AUDD   | AUDD              | 6        | AU     |
+| CADC   | CAD Coin          | 6        | CA     |
+| ZCHF   | Frankencoin       | 6        | CH     |
+| TGBP   | Tokenised GBP     | 18       | GB     |
+| IDRX   | Indonesia Rupiah  | 6        | ID     |
 
 ## Contract Addresses
-### Lisk Sepolia (Testnet)
+### Base Sepolia (Testnet)
 
 ```
 EntryPoint:            0x0000000071727De22E5E9d8BAf0edAc6f37da032

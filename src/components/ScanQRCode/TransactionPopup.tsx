@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useState, useEffect, useMemo, useCallback } from "react";
 import Image from "next/image";
@@ -23,7 +23,7 @@ import {
   parseUnits,
   type Address,
 } from "viem";
-import { LISK_SEPOLIA } from "@/config/chains";
+import { BASE_SEPOLIA } from "@/config/chains";
 import {
   PAYMENT_PROCESSOR_ABI,
   ERC20_ABI,
@@ -35,12 +35,14 @@ import { ReceiptPopUp, ReceiptData } from "@/components/ReceiptPopUp";
 // Token rates: how many tokens equal 1 USD
 const TOKEN_RATES: Record<string, number> = {
   USDC: 1,
-  USDT: 1,
+  USDS: 1,
+  EURC: 0.95,
+  BRZ: 5,
+  AUDD: 1.6,
+  CADC: 1.35,
+  ZCHF: 0.9,
+  TGBP: 0.8,
   IDRX: 16000,
-  JPYC: 150,
-  EURC: 0.92,
-  MXNT: 20000,
-  CNHT: 7,
 };
 
 const MULTI_FEE_MULTIPLIER = 1.005;
@@ -148,8 +150,8 @@ export default function TransactionPopup({
   const publicClient = useMemo(
     () =>
       createPublicClient({
-        chain: LISK_SEPOLIA,
-        transport: http(LISK_SEPOLIA.rpcUrls.default.http[0]),
+        chain: BASE_SEPOLIA,
+        transport: http(BASE_SEPOLIA.rpcUrls.default.http[0]),
       }),
     [],
   );
@@ -596,7 +598,7 @@ export default function TransactionPopup({
           timestamp: new Date(),
           amount: Number(formatUnits(quote.totalRequired, payToken.decimals)),
           currency: payToken.symbol,
-          currencyIcon: `/icons/${payToken.symbol.toLowerCase()}.svg`,
+          currencyIcon: payToken.icon,
           toAddress: payload.request.recipient,
           txHash: txHash,
         });

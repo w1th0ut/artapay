@@ -13,7 +13,7 @@ import {
   parseUnits,
   type Address,
 } from "viem";
-import { LISK_SEPOLIA } from "@/config/chains";
+import { BASE_SEPOLIA } from "@/config/chains";
 import { STABLECOIN_REGISTRY_ADDRESS } from "@/config/constants";
 import { STABLECOIN_REGISTRY_ABI } from "@/config/abi";
 
@@ -38,8 +38,8 @@ export default function TopUpIDRX() {
   const publicClient = useMemo(
     () =>
       createPublicClient({
-        chain: LISK_SEPOLIA,
-        transport: http(LISK_SEPOLIA.rpcUrls.default.http[0]),
+        chain: BASE_SEPOLIA,
+        transport: http(BASE_SEPOLIA.rpcUrls.default.http[0]),
       }),
     [],
   );

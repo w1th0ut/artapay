@@ -90,38 +90,16 @@ export const env = {
     ),
     "NEXT_PUBLIC_TOKEN_USDC_DECIMALS",
   ),
-  tokenUsdtAddress: requireEnv(
-    process.env.NEXT_PUBLIC_TOKEN_USDT_ADDRESS,
-    "NEXT_PUBLIC_TOKEN_USDT_ADDRESS",
+  tokenUsdsAddress: requireEnv(
+    process.env.NEXT_PUBLIC_TOKEN_USDS_ADDRESS,
+    "NEXT_PUBLIC_TOKEN_USDS_ADDRESS",
   ),
-  tokenUsdtDecimals: parseNumber(
+  tokenUsdsDecimals: parseNumber(
     requireEnv(
-      process.env.NEXT_PUBLIC_TOKEN_USDT_DECIMALS,
-      "NEXT_PUBLIC_TOKEN_USDT_DECIMALS",
+      process.env.NEXT_PUBLIC_TOKEN_USDS_DECIMALS,
+      "NEXT_PUBLIC_TOKEN_USDS_DECIMALS",
     ),
-    "NEXT_PUBLIC_TOKEN_USDT_DECIMALS",
-  ),
-  tokenIdrxAddress: requireEnv(
-    process.env.NEXT_PUBLIC_TOKEN_IDRX_ADDRESS,
-    "NEXT_PUBLIC_TOKEN_IDRX_ADDRESS",
-  ),
-  tokenIdrxDecimals: parseNumber(
-    requireEnv(
-      process.env.NEXT_PUBLIC_TOKEN_IDRX_DECIMALS,
-      "NEXT_PUBLIC_TOKEN_IDRX_DECIMALS",
-    ),
-    "NEXT_PUBLIC_TOKEN_IDRX_DECIMALS",
-  ),
-  tokenJpycAddress: requireEnv(
-    process.env.NEXT_PUBLIC_TOKEN_JPYC_ADDRESS,
-    "NEXT_PUBLIC_TOKEN_JPYC_ADDRESS",
-  ),
-  tokenJpycDecimals: parseNumber(
-    requireEnv(
-      process.env.NEXT_PUBLIC_TOKEN_JPYC_DECIMALS,
-      "NEXT_PUBLIC_TOKEN_JPYC_DECIMALS",
-    ),
-    "NEXT_PUBLIC_TOKEN_JPYC_DECIMALS",
+    "NEXT_PUBLIC_TOKEN_USDS_DECIMALS",
   ),
   tokenEurcAddress: requireEnv(
     process.env.NEXT_PUBLIC_TOKEN_EURC_ADDRESS,
@@ -134,27 +112,71 @@ export const env = {
     ),
     "NEXT_PUBLIC_TOKEN_EURC_DECIMALS",
   ),
-  tokenMxntAddress: requireEnv(
-    process.env.NEXT_PUBLIC_TOKEN_MXNT_ADDRESS,
-    "NEXT_PUBLIC_TOKEN_MXNT_ADDRESS",
+  tokenBrzAddress: requireEnv(
+    process.env.NEXT_PUBLIC_TOKEN_BRZ_ADDRESS,
+    "NEXT_PUBLIC_TOKEN_BRZ_ADDRESS",
   ),
-  tokenMxntDecimals: parseNumber(
+  tokenBrzDecimals: parseNumber(
     requireEnv(
-      process.env.NEXT_PUBLIC_TOKEN_MXNT_DECIMALS,
-      "NEXT_PUBLIC_TOKEN_MXNT_DECIMALS",
+      process.env.NEXT_PUBLIC_TOKEN_BRZ_DECIMALS,
+      "NEXT_PUBLIC_TOKEN_BRZ_DECIMALS",
     ),
-    "NEXT_PUBLIC_TOKEN_MXNT_DECIMALS",
+    "NEXT_PUBLIC_TOKEN_BRZ_DECIMALS",
   ),
-  tokenCnhtAddress: requireEnv(
-    process.env.NEXT_PUBLIC_TOKEN_CNHT_ADDRESS,
-    "NEXT_PUBLIC_TOKEN_CNHT_ADDRESS",
+  tokenAuddAddress: requireEnv(
+    process.env.NEXT_PUBLIC_TOKEN_AUDD_ADDRESS,
+    "NEXT_PUBLIC_TOKEN_AUDD_ADDRESS",
   ),
-  tokenCnhtDecimals: parseNumber(
+  tokenAuddDecimals: parseNumber(
     requireEnv(
-      process.env.NEXT_PUBLIC_TOKEN_CNHT_DECIMALS,
-      "NEXT_PUBLIC_TOKEN_CNHT_DECIMALS",
+      process.env.NEXT_PUBLIC_TOKEN_AUDD_DECIMALS,
+      "NEXT_PUBLIC_TOKEN_AUDD_DECIMALS",
     ),
-    "NEXT_PUBLIC_TOKEN_CNHT_DECIMALS",
+    "NEXT_PUBLIC_TOKEN_AUDD_DECIMALS",
+  ),
+  tokenCadcAddress: requireEnv(
+    process.env.NEXT_PUBLIC_TOKEN_CADC_ADDRESS,
+    "NEXT_PUBLIC_TOKEN_CADC_ADDRESS",
+  ),
+  tokenCadcDecimals: parseNumber(
+    requireEnv(
+      process.env.NEXT_PUBLIC_TOKEN_CADC_DECIMALS,
+      "NEXT_PUBLIC_TOKEN_CADC_DECIMALS",
+    ),
+    "NEXT_PUBLIC_TOKEN_CADC_DECIMALS",
+  ),
+  tokenZchfAddress: requireEnv(
+    process.env.NEXT_PUBLIC_TOKEN_ZCHF_ADDRESS,
+    "NEXT_PUBLIC_TOKEN_ZCHF_ADDRESS",
+  ),
+  tokenZchfDecimals: parseNumber(
+    requireEnv(
+      process.env.NEXT_PUBLIC_TOKEN_ZCHF_DECIMALS,
+      "NEXT_PUBLIC_TOKEN_ZCHF_DECIMALS",
+    ),
+    "NEXT_PUBLIC_TOKEN_ZCHF_DECIMALS",
+  ),
+  tokenTgbpAddress: requireEnv(
+    process.env.NEXT_PUBLIC_TOKEN_TGBP_ADDRESS,
+    "NEXT_PUBLIC_TOKEN_TGBP_ADDRESS",
+  ),
+  tokenTgbpDecimals: parseNumber(
+    requireEnv(
+      process.env.NEXT_PUBLIC_TOKEN_TGBP_DECIMALS,
+      "NEXT_PUBLIC_TOKEN_TGBP_DECIMALS",
+    ),
+    "NEXT_PUBLIC_TOKEN_TGBP_DECIMALS",
+  ),
+  tokenIdrxAddress: requireEnv(
+    process.env.NEXT_PUBLIC_TOKEN_IDRX_ADDRESS,
+    "NEXT_PUBLIC_TOKEN_IDRX_ADDRESS",
+  ),
+  tokenIdrxDecimals: parseNumber(
+    requireEnv(
+      process.env.NEXT_PUBLIC_TOKEN_IDRX_DECIMALS,
+      "NEXT_PUBLIC_TOKEN_IDRX_DECIMALS",
+    ),
+    "NEXT_PUBLIC_TOKEN_IDRX_DECIMALS",
   ),
   activityLookbackBlocks: parseNumber(
     requireEnv(

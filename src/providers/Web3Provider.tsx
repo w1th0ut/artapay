@@ -5,16 +5,16 @@ import { WagmiProvider, createConfig, http } from "wagmi";
 import { injected } from "wagmi/connectors";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { PrivyProvider } from "@privy-io/react-auth";
-import { LISK_SEPOLIA } from "@/config/chains";
+import { BASE_SEPOLIA } from "@/config/chains";
 import { env } from "@/config/env";
 
 const queryClient = new QueryClient();
 
 const wagmiConfig = createConfig({
-  chains: [LISK_SEPOLIA],
+  chains: [BASE_SEPOLIA],
   connectors: [injected({ shimDisconnect: true })],
   transports: {
-    [LISK_SEPOLIA.id]: http(env.rpcUrl),
+    [BASE_SEPOLIA.id]: http(env.rpcUrl),
   },
   multiInjectedProviderDiscovery: false,
 });

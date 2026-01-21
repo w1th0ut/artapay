@@ -11,7 +11,7 @@ interface TechItem {
 const techStack: TechItem[] = [
     { name: 'Foundry', icon: '/icons/Foundry.svg' },
     { name: 'Gelato', icon: '/icons/Gelato.svg' },
-    { name: 'Lisk', icon: '/icons/Lisk.svg' },
+    { name: 'Base', icon: '/icons/Base.svg' },
     { name: 'Wagmi', icon: '/icons/Wagmi.svg' },
     { name: 'Viem', icon: '/icons/Viem.svg' },
     { name: 'Privy', icon: '/icons/Privy.svg' },

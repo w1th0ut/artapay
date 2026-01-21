@@ -5,7 +5,7 @@ import OpenCamera from "./OpenCamera";
 import ImportFromGallery from "./ImportFromGallery";
 import TransactionPopup from "./TransactionPopup";
 import { PAYMENT_PROCESSOR_ADDRESS } from "@/config/constants";
-import { LISK_SEPOLIA } from "@/config/chains";
+import { BASE_SEPOLIA } from "@/config/chains";
 import { ReceiptPopUp, ReceiptData } from "@/components/ReceiptPopUp";
 import Modal from "@/components/Modal";
 
@@ -74,9 +74,9 @@ export default function QRCode({ onScanResult, disabled }: QRCodeProps) {
       }
 
       // Validate chain and processor
-      if (data.chainId !== LISK_SEPOLIA.id) {
+      if (data.chainId !== BASE_SEPOLIA.id) {
         throw new Error(
-          `Wrong network. Expected Lisk Sepolia (${LISK_SEPOLIA.id})`
+          `Wrong network. Expected Base Sepolia (${BASE_SEPOLIA.id})`
         );
       }
 

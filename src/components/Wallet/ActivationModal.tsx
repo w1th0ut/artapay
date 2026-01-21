@@ -16,7 +16,7 @@ import { TOKENS } from "@/config/constants";
 import Modal from "@/components/Modal";
 
 // Minimum ETH required for activation (in ETH)
-const MIN_ETH_REQUIRED = parseEther("0.000001");
+const MIN_ETH_REQUIRED = parseEther("0.00001");
 
 interface ActivationModalProps {
   ethBalance: bigint;
@@ -171,7 +171,7 @@ export default function ActivationModal({
                 </div>
               </div>
               <a
-                href={`https://sepolia-blockscout.lisk.com/address/${smartAccountAddress}`}
+                href={`https://base-sepolia.blockscout.com/address/${smartAccountAddress}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-2 text-primary text-xs hover:underline"

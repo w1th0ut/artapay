@@ -9,15 +9,15 @@ import { useSmartAccount } from "@/hooks/useSmartAccount";
 import { fetchSwapQuote, SwapQuoteResponse } from "@/api/swapApi";
 import { STABLE_SWAP_ADDRESS } from "@/config/constants";
 import { parseUnits, formatUnits, type Address } from "viem";
-import { LISK_SEPOLIA } from "@/config/chains";
+import { BASE_SEPOLIA } from "@/config/chains";
 import { createPublicClient, http } from "viem";
 import { ERC20_ABI } from "@/config/abi";
 import { ReceiptPopUp, ReceiptData } from "@/components/ReceiptPopUp";
 import Modal from "@/components/Modal";
 
 const publicClient = createPublicClient({
-  chain: LISK_SEPOLIA,
-  transport: http(LISK_SEPOLIA.rpcUrls.default.http[0]),
+  chain: BASE_SEPOLIA,
+  transport: http(BASE_SEPOLIA.rpcUrls.default.http[0]),
 });
 
 export default function SwapToken() {

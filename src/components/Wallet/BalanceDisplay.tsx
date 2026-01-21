@@ -5,14 +5,14 @@ import Image from "next/image";
 import { Eye, EyeOff, ChevronDown, Loader2 } from "lucide-react";
 import { useSmartAccount } from "@/hooks/useSmartAccount";
 import { TOKENS } from "@/config/constants";
-import { LISK_SEPOLIA } from "@/config/chains";
+import { BASE_SEPOLIA } from "@/config/chains";
 import { createPublicClient, http, formatUnits, type Address } from "viem";
 import { ERC20_ABI } from "@/config/abi";
 import Modal from "@/components/Modal";
 
 const publicClient = createPublicClient({
-  chain: LISK_SEPOLIA,
-  transport: http(LISK_SEPOLIA.rpcUrls.default.http[0]),
+  chain: BASE_SEPOLIA,
+  transport: http(BASE_SEPOLIA.rpcUrls.default.http[0]),
 });
 
 type TokenBalances = { [symbol: string]: string };
@@ -155,7 +155,7 @@ export default function BalanceDisplay() {
         className="flex items-center gap-1.5 px-2 py-1 bg-zinc-800/50 rounded-lg hover:bg-zinc-800 transition-colors cursor-pointer"
       >
         <Image
-          src={`/icons/${selectedToken.symbol.toLowerCase()}.svg`}
+          src={selectedToken.icon}
           alt={selectedToken.symbol}
           width={16}
           height={16}
@@ -207,7 +207,7 @@ export default function BalanceDisplay() {
               >
                 <div className="flex items-center gap-2">
                   <Image
-                    src={`/icons/${token.symbol.toLowerCase()}.svg`}
+                    src={token.icon}
                     alt={token.symbol}
                     width={20}
                     height={20}

@@ -7,7 +7,7 @@ import GeneratedQRCode from "./GeneratedQRCode";
 import { CurrencyDropdown, Currency, currencies } from "@/components/Currency";
 import { useSmartAccount } from "@/hooks/useSmartAccount";
 import { PAYMENT_PROCESSOR_ADDRESS } from "@/config/constants";
-import { LISK_SEPOLIA } from "@/config/chains";
+import { BASE_SEPOLIA } from "@/config/chains";
 import { parseUnits, keccak256, encodeAbiParameters, toHex } from "viem";
 import { ReceiptPopUp, ReceiptData } from "@/components/ReceiptPopUp";
 import Modal from "@/components/Modal";
@@ -114,7 +114,7 @@ export default function GenerateQRCode() {
           ],
           [
             PAYMENT_PROCESSOR_ADDRESS as `0x${string}`,
-            BigInt(LISK_SEPOLIA.id),
+            BigInt(BASE_SEPOLIA.id),
             smartAccountAddress,
             currency.tokenAddress as `0x${string}`,
             requestedAmountRaw,
@@ -133,7 +133,7 @@ export default function GenerateQRCode() {
       const payload: PaymentRequestPayload = {
         version: "artapay-payment-v2",
         processor: PAYMENT_PROCESSOR_ADDRESS,
-        chainId: LISK_SEPOLIA.id,
+        chainId: BASE_SEPOLIA.id,
         request: {
           recipient: smartAccountAddress,
           requestedToken: currency.tokenAddress,

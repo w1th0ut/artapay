@@ -1,12 +1,12 @@
 import { useState, useEffect, useCallback } from "react";
 import { createPublicClient, http, type Address } from "viem";
-import { LISK_SEPOLIA } from "@/config/chains";
+import { BASE_SEPOLIA } from "@/config/chains";
 import { ERC20_ABI } from "@/config/abi";
 import { TOKENS, PAYMASTER_ADDRESS } from "@/config/constants";
 
 const publicClient = createPublicClient({
-  chain: LISK_SEPOLIA,
-  transport: http(LISK_SEPOLIA.rpcUrls.default.http[0]),
+  chain: BASE_SEPOLIA,
+  transport: http(BASE_SEPOLIA.rpcUrls.default.http[0]),
 });
 
 export function useApprovalStatus(smartAccountAddress: Address | null) {

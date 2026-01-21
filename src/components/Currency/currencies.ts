@@ -23,12 +23,14 @@ const getToken = (symbol: string) => {
 
 const chainId = env.chainId;
 const usdc = getToken("USDC");
-const usdt = getToken("USDT");
-const idrx = getToken("IDRX");
-const jpyc = getToken("JPYC");
+const usds = getToken("USDS");
 const eurc = getToken("EURC");
-const mxnt = getToken("MXNT");
-const cnht = getToken("CNHT");
+const brz = getToken("BRZ");
+const audd = getToken("AUDD");
+const cadc = getToken("CADC");
+const zchf = getToken("ZCHF");
+const tgbp = getToken("TGBP");
+const idrx = getToken("IDRX");
 
 export const currencies: Currency[] = [
   {
@@ -41,31 +43,13 @@ export const currencies: Currency[] = [
     decimals: usdc.decimals,
   },
   {
-    id: "usdt",
-    name: "USD Tether",
-    symbol: "USDT",
-    icon: "/icons/usdt.svg",
+    id: "usds",
+    name: "Sky Dollar",
+    symbol: "USDS",
+    icon: "/icons/usdc.svg",
     chainId,
-    tokenAddress: usdt.address,
-    decimals: usdt.decimals,
-  },
-  {
-    id: "idrx",
-    name: "IDRX",
-    symbol: "IDRX",
-    icon: "/icons/idrx.svg",
-    chainId,
-    tokenAddress: idrx.address,
-    decimals: idrx.decimals,
-  },
-  {
-    id: "jpyc",
-    name: "JPY Coin",
-    symbol: "JPYC",
-    icon: "/icons/jpyc.svg",
-    chainId,
-    tokenAddress: jpyc.address,
-    decimals: jpyc.decimals,
+    tokenAddress: usds.address,
+    decimals: usds.decimals,
   },
   {
     id: "eurc",
@@ -77,21 +61,57 @@ export const currencies: Currency[] = [
     decimals: eurc.decimals,
   },
   {
-    id: "mxnt",
-    name: "Mexican Peso Tether",
-    symbol: "MXNT",
-    icon: "/icons/mxnt.svg",
+    id: "brz",
+    name: "Brazilian Digital",
+    symbol: "BRZ",
+    icon: "/icons/usdc.svg",
     chainId,
-    tokenAddress: mxnt.address,
-    decimals: mxnt.decimals,
+    tokenAddress: brz.address,
+    decimals: brz.decimals,
   },
   {
-    id: "cnht",
-    name: "CNH Tether",
-    symbol: "CNHT",
-    icon: "/icons/cnht.svg",
+    id: "audd",
+    name: "AUDD",
+    symbol: "AUDD",
+    icon: "/icons/usdc.svg",
     chainId,
-    tokenAddress: cnht.address,
-    decimals: cnht.decimals,
+    tokenAddress: audd.address,
+    decimals: audd.decimals,
+  },
+  {
+    id: "cadc",
+    name: "CAD Coin",
+    symbol: "CADC",
+    icon: "/icons/usdc.svg",
+    chainId,
+    tokenAddress: cadc.address,
+    decimals: cadc.decimals,
+  },
+  {
+    id: "zchf",
+    name: "Frankencoin",
+    symbol: "ZCHF",
+    icon: "/icons/usdc.svg",
+    chainId,
+    tokenAddress: zchf.address,
+    decimals: zchf.decimals,
+  },
+  {
+    id: "tgbp",
+    name: "Tokenised GBP",
+    symbol: "TGBP",
+    icon: "/icons/usdc.svg",
+    chainId,
+    tokenAddress: tgbp.address,
+    decimals: tgbp.decimals,
+  },
+  {
+    id: "idrx",
+    name: "IDRX",
+    symbol: "IDRX",
+    icon: "/icons/idrx.svg",
+    chainId,
+    tokenAddress: idrx.address,
+    decimals: idrx.decimals,
   },
 ];

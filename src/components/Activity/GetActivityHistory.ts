@@ -6,7 +6,7 @@ import {
   formatUnits,
   type Address,
 } from "viem";
-import { LISK_SEPOLIA } from "@/config/chains";
+import { BASE_SEPOLIA } from "@/config/chains";
 import {
   PAYMENT_PROCESSOR_ADDRESS,
   PAYMASTER_ADDRESS,
@@ -16,8 +16,8 @@ import {
 import { env } from "@/config/env";
 
 const publicClient = createPublicClient({
-  chain: LISK_SEPOLIA,
-  transport: http(LISK_SEPOLIA.rpcUrls.default.http[0]),
+  chain: BASE_SEPOLIA,
+  transport: http(BASE_SEPOLIA.rpcUrls.default.http[0]),
 });
 
 const transferEventAbi = parseAbiItem(
@@ -150,10 +150,10 @@ export async function fetchActivityHistory(
         timestamp,
         amount: amountIn,
         currency: pair.out.token.symbol,
-        currencyIcon: `/icons/${pair.out.token.symbol.toLowerCase()}.svg`,
+        currencyIcon: pair.out.token.icon,
         swapToAmount: amountOut,
         swapToCurrency: pair.in.token.symbol,
-        swapToCurrencyIcon: `/icons/${pair.in.token.symbol.toLowerCase()}.svg`,
+        swapToCurrencyIcon: pair.in.token.icon,
         txHash,
       });
       processedLogIds.add(activityId);
@@ -191,7 +191,7 @@ export async function fetchActivityHistory(
           timestamp,
           amount,
           currency: token.symbol,
-          currencyIcon: `/icons/${token.symbol.toLowerCase()}.svg`,
+          currencyIcon: token.icon,
           txHash: entry.log.transactionHash,
           fromAddress: args.payer,
           toAddress: args.recipient,
@@ -210,7 +210,7 @@ export async function fetchActivityHistory(
           timestamp,
           amount,
           currency: token.symbol,
-          currencyIcon: `/icons/${token.symbol.toLowerCase()}.svg`,
+          currencyIcon: token.icon,
           txHash: entry.log.transactionHash,
           fromAddress: args.payer,
           toAddress: args.recipient,
@@ -253,7 +253,7 @@ export async function fetchActivityHistory(
         timestamp,
         amount,
         currency: entry.token.symbol,
-        currencyIcon: `/icons/${entry.token.symbol.toLowerCase()}.svg`,
+        currencyIcon: entry.token.icon,
         txHash: entry.log.transactionHash,
         fromAddress: entry.log.args?.from as Address | undefined,
         toAddress: entry.log.args?.to as Address | undefined,

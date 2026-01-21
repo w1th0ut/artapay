@@ -14,43 +14,66 @@ export const PAYMENT_PROCESSOR_ADDRESS = env.paymentProcessorAddress as Address;
 export const STABLECOIN_REGISTRY_ADDRESS =
   env.stablecoinRegistryAddress as Address;
 
-export const TOKENS: { symbol: string; address: Address; decimals: number }[] =
-  [
-    {
-      symbol: "USDC",
-      address: env.tokenUsdcAddress as Address,
-      decimals: env.tokenUsdcDecimals,
-    },
-    {
-      symbol: "USDT",
-      address: env.tokenUsdtAddress as Address,
-      decimals: env.tokenUsdtDecimals,
-    },
-    {
-      symbol: "IDRX",
-      address: env.tokenIdrxAddress as Address,
-      decimals: env.tokenIdrxDecimals,
-    },
-    {
-      symbol: "JPYC",
-      address: env.tokenJpycAddress as Address,
-      decimals: env.tokenJpycDecimals,
-    },
-    {
-      symbol: "EURC",
-      address: env.tokenEurcAddress as Address,
-      decimals: env.tokenEurcDecimals,
-    },
-    {
-      symbol: "MXNT",
-      address: env.tokenMxntAddress as Address,
-      decimals: env.tokenMxntDecimals,
-    },
-    {
-      symbol: "CNHT",
-      address: env.tokenCnhtAddress as Address,
-      decimals: env.tokenCnhtDecimals,
-    },
-  ];
+export const TOKENS: {
+  symbol: string;
+  address: Address;
+  decimals: number;
+  icon: string;
+}[] = [
+  {
+    symbol: "USDC",
+    address: env.tokenUsdcAddress as Address,
+    decimals: env.tokenUsdcDecimals,
+    icon: "/icons/usdc.svg",
+  },
+  {
+    symbol: "USDS",
+    address: env.tokenUsdsAddress as Address,
+    decimals: env.tokenUsdsDecimals,
+    icon: "/icons/usdc.svg",
+  },
+  {
+    symbol: "EURC",
+    address: env.tokenEurcAddress as Address,
+    decimals: env.tokenEurcDecimals,
+    icon: "/icons/eurc.svg",
+  },
+  {
+    symbol: "BRZ",
+    address: env.tokenBrzAddress as Address,
+    decimals: env.tokenBrzDecimals,
+    icon: "/icons/usdc.svg",
+  },
+  {
+    symbol: "AUDD",
+    address: env.tokenAuddAddress as Address,
+    decimals: env.tokenAuddDecimals,
+    icon: "/icons/usdc.svg",
+  },
+  {
+    symbol: "CADC",
+    address: env.tokenCadcAddress as Address,
+    decimals: env.tokenCadcDecimals,
+    icon: "/icons/usdc.svg",
+  },
+  {
+    symbol: "ZCHF",
+    address: env.tokenZchfAddress as Address,
+    decimals: env.tokenZchfDecimals,
+    icon: "/icons/usdc.svg",
+  },
+  {
+    symbol: "TGBP",
+    address: env.tokenTgbpAddress as Address,
+    decimals: env.tokenTgbpDecimals,
+    icon: "/icons/usdc.svg",
+  },
+  {
+    symbol: "IDRX",
+    address: env.tokenIdrxAddress as Address,
+    decimals: env.tokenIdrxDecimals,
+    icon: "/icons/idrx.svg",
+  },
+];
 
 export const DEFAULT_TOKEN_SYMBOL = env.defaultTokenSymbol;
