@@ -37,7 +37,6 @@ export default function Start() {
     smartAccountAddress,
     approvePaymaster,
     status,
-    baseAppDebug,
     baseAppDeployment,
   } = useSmartAccount();
   const { isApproved, isChecking, refresh } = useApprovalStatus(
@@ -119,7 +118,6 @@ export default function Start() {
         <ActivationModal
           onActivate={handleActivate}
           status={status}
-          baseAppDebug={baseAppDebug}
           baseAppDeployment={baseAppDeployment}
         />
       )}

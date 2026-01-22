@@ -10,7 +10,6 @@ import {
   decodeAbiParameters,
   getAddress,
   hashTypedData,
-  hashMessage,
   http,
   type Address,
   encodeAbiParameters,
@@ -54,28 +53,6 @@ function transformError(err: unknown): string {
   return message;
 }
 
-export type BaseAppDebugInfo = {
-  mode: "base_account";
-  time: string;
-  chainId: number;
-  verifyingContract: Address;
-  eoaAddress: Address;
-  messageHash: `0x${string}`;
-  typedDataHash: `0x${string}`;
-  signatureMethod: "typedData" | "signMessage";
-  signatureByteLength?: number;
-  rawSignature?: `0x${string}`;
-  decodedWrapper?: { ownerIndex: string; signatureDataLength: number } | null;
-  decodedReversedWrapper?: { ownerIndex: string; signatureDataLength: number } | null;
-  wrappedSignature0?: `0x${string}`;
-  wrappedSignature1?: `0x${string}`;
-  hashChecks?: Record<string, boolean>;
-  replaySafeHash?: `0x${string}` | null;
-  candidates?: { signature: `0x${string}`; ownerIndex?: number; valid: boolean }[];
-  selectedSignature?: `0x${string}`;
-  error?: string;
-};
-
 export type BaseAppDeploymentStatus = {
   status: "checking" | "deployed" | "missing" | "unknown";
   address: Address;
@@ -102,7 +79,6 @@ export function useSmartAccount() {
   const [isLoading, setIsLoading] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true); // Track initial loading
   const [error, setError] = useState<string | null>(null);
-  const [baseAppDebug, setBaseAppDebug] = useState<BaseAppDebugInfo | null>(null);
   const [baseAppDeployment, setBaseAppDeployment] =
     useState<BaseAppDeploymentStatus | null>(null);
   const [client, setClient] = useState<ReturnType<
@@ -379,7 +355,6 @@ export function useSmartAccount() {
 
         addCandidate(rawSig);
         tryDecodeBytes(rawSig);
-        const sigByteLength = (rawSig.length - 2) / 2;
         let ownerIndexMax = 5;
         try {
           const nextOwnerIndex = (await publicClient.readContract({
@@ -409,25 +384,6 @@ export function useSmartAccount() {
           candidateOwnerIndex.set(wrapped, i);
         }
 
-        let decodedWrapper: { ownerIndex: string; signatureDataLength: number } | null = null;
-        let decodedReversedWrapper:
-          | { ownerIndex: string; signatureDataLength: number }
-          | null = null;
-        try {
-          const [ownerIndex, signatureData] = decodeAbiParameters(
-            [
-              { name: "ownerIndex", type: "uint256" },
-              { name: "signatureData", type: "bytes" },
-            ],
-            rawSig,
-          ) as [bigint, `0x${string}`];
-          decodedWrapper = {
-            ownerIndex: ownerIndex.toString(),
-            signatureDataLength: (signatureData.length - 2) / 2,
-          };
-        } catch {
-          decodedWrapper = null;
-        }
         try {
           const [signatureData, ownerIndex] = decodeAbiParameters(
             [
@@ -437,10 +393,6 @@ export function useSmartAccount() {
             rawSig,
           ) as [`0x${string}`, bigint];
           if (signatureData && signatureData !== "0x") {
-            decodedReversedWrapper = {
-              ownerIndex: ownerIndex.toString(),
-              signatureDataLength: (signatureData.length - 2) / 2,
-            };
             const normalized = wrapBaseAccountSignature(
               signatureData,
               ownerIndex,
@@ -449,7 +401,7 @@ export function useSmartAccount() {
             candidateOwnerIndex.set(normalized, Number(ownerIndex));
           }
         } catch {
-          decodedReversedWrapper = null;
+          // ignore decode errors
         }
 
         // If we decoded a nested signature, try decoding one more layer.
@@ -458,71 +410,14 @@ export function useSmartAccount() {
         }
         const candidates = Array.from(candidatesSet);
 
-        const results: {
-          signature: `0x${string}`;
-          ownerIndex?: number;
-          valid: boolean;
-        }[] = [];
-        const hashChecks: Record<string, boolean> = {};
-        let replaySafeHash: `0x${string}` | null = null;
-        try {
-          replaySafeHash = (await publicClient.readContract({
-            address: eoaAddress,
-            abi: [
-              {
-                type: "function",
-                name: "replaySafeHash",
-                stateMutability: "view",
-                inputs: [{ name: "hash", type: "bytes32" }],
-                outputs: [{ name: "replayHash", type: "bytes32" }],
-              },
-            ],
-            functionName: "replaySafeHash",
-            args: [hash],
-          })) as `0x${string}`;
-        } catch {
-          replaySafeHash = null;
-        }
-        const hashCandidates: Record<string, `0x${string}`> = {
-          typedDataHash: typedDigest,
-          userOpHash: hash,
-          ethSignedUserOpHash: hashMessage({ raw: hash }),
-        };
-        if (replaySafeHash) {
-          hashCandidates.replaySafeHash = replaySafeHash;
-        }
-
         let selected: `0x${string}` | null = null;
         for (const candidate of candidates) {
           const valid = await validateSignature(candidate, typedDigest);
           const ownerIndex = candidateOwnerIndex.get(candidate);
-          results.push({ signature: candidate, ownerIndex, valid });
           if (!selected && valid) {
             selected = candidate;
           }
         }
-
-        for (const [label, hashToCheck] of Object.entries(hashCandidates)) {
-          hashChecks[label] = await validateSignature(rawSig, hashToCheck);
-        }
-        setBaseAppDebug({
-          mode: "base_account",
-          time: new Date().toISOString(),
-          chainId: BASE_SEPOLIA.id,
-          verifyingContract: eoaAddress,
-          eoaAddress,
-          messageHash: hash,
-          typedDataHash: typedDigest,
-          signatureMethod: "typedData",
-          signatureByteLength: sigByteLength,
-          rawSignature: rawSig,
-          decodedWrapper,
-          decodedReversedWrapper,
-          hashChecks,
-          replaySafeHash,
-          candidates: results,
-          selectedSignature: selected ?? rawSig,
-        });
 
         const fallbackIndex = candidateOwnerIndex.values().next().value;
         return selected ?? wrapBaseAccountSignature(rawSig, BigInt(fallbackIndex ?? 0));
@@ -531,7 +426,6 @@ export function useSmartAccount() {
         const rawSig = (await effectiveWalletClient.signMessage({
           message,
         } as any)) as `0x${string}`;
-        const sigByteLength = (rawSig.length - 2) / 2;
         const candidatesSet = new Set<`0x${string}`>();
         const candidateOwnerIndex = new Map<`0x${string}`, number>();
         const addCandidate = (value?: `0x${string}`) => {
@@ -583,25 +477,6 @@ export function useSmartAccount() {
           candidateOwnerIndex.set(wrapped, i);
         }
 
-        let decodedWrapper: { ownerIndex: string; signatureDataLength: number } | null = null;
-        let decodedReversedWrapper:
-          | { ownerIndex: string; signatureDataLength: number }
-          | null = null;
-        try {
-          const [ownerIndex, signatureData] = decodeAbiParameters(
-            [
-              { name: "ownerIndex", type: "uint256" },
-              { name: "signatureData", type: "bytes" },
-            ],
-            rawSig,
-          ) as [bigint, `0x${string}`];
-          decodedWrapper = {
-            ownerIndex: ownerIndex.toString(),
-            signatureDataLength: (signatureData.length - 2) / 2,
-          };
-        } catch {
-          decodedWrapper = null;
-        }
         try {
           const [signatureData, ownerIndex] = decodeAbiParameters(
             [
@@ -611,10 +486,6 @@ export function useSmartAccount() {
             rawSig,
           ) as [`0x${string}`, bigint];
           if (signatureData && signatureData !== "0x") {
-            decodedReversedWrapper = {
-              ownerIndex: ownerIndex.toString(),
-              signatureDataLength: (signatureData.length - 2) / 2,
-            };
             const normalized = wrapBaseAccountSignature(
               signatureData,
               ownerIndex,
@@ -623,79 +494,21 @@ export function useSmartAccount() {
             candidateOwnerIndex.set(normalized, Number(ownerIndex));
           }
         } catch {
-          decodedReversedWrapper = null;
+          // ignore decode errors
         }
 
         for (const candidate of Array.from(candidatesSet)) {
           tryDecodeBytes(candidate);
         }
         const candidates = Array.from(candidatesSet);
-        const results: {
-          signature: `0x${string}`;
-          ownerIndex?: number;
-          valid: boolean;
-        }[] = [];
-        const hashChecks: Record<string, boolean> = {};
-        let replaySafeHash: `0x${string}` | null = null;
-        try {
-          replaySafeHash = (await publicClient.readContract({
-            address: eoaAddress,
-            abi: [
-              {
-                type: "function",
-                name: "replaySafeHash",
-                stateMutability: "view",
-                inputs: [{ name: "hash", type: "bytes32" }],
-                outputs: [{ name: "replayHash", type: "bytes32" }],
-              },
-            ],
-            functionName: "replaySafeHash",
-            args: [hash],
-          })) as `0x${string}`;
-        } catch {
-          replaySafeHash = null;
-        }
-        const hashCandidates: Record<string, `0x${string}`> = {
-          typedDataHash: typedDigest,
-          userOpHash: hash,
-          ethSignedUserOpHash: hashMessage({ raw: hash }),
-        };
-        if (replaySafeHash) {
-          hashCandidates.replaySafeHash = replaySafeHash;
-        }
-
         let selected: `0x${string}` | null = null;
         for (const candidate of candidates) {
           const valid = await validateSignature(candidate, typedDigest);
           const ownerIndex = candidateOwnerIndex.get(candidate);
-          results.push({ signature: candidate, ownerIndex, valid });
           if (!selected && valid) {
             selected = candidate;
           }
         }
-
-        for (const [label, hashToCheck] of Object.entries(hashCandidates)) {
-          hashChecks[label] = await validateSignature(rawSig, hashToCheck);
-        }
-        setBaseAppDebug({
-          mode: "base_account",
-          time: new Date().toISOString(),
-          chainId: BASE_SEPOLIA.id,
-          verifyingContract: eoaAddress,
-          eoaAddress,
-          messageHash: hash,
-          typedDataHash: typedDigest,
-          signatureMethod: "signMessage",
-          signatureByteLength: sigByteLength,
-          rawSignature: rawSig,
-          decodedWrapper,
-          decodedReversedWrapper,
-          hashChecks,
-          replaySafeHash,
-          candidates: results,
-          selectedSignature: selected ?? rawSig,
-          error: err instanceof Error ? err.message : String(err),
-        });
         if (selected) {
           return selected;
         }
@@ -1627,7 +1440,6 @@ export function useSmartAccount() {
     payInvoice,
     payMultiTokenInvoice,
     signMessageWithEOA,
-    baseAppDebug,
     baseAppDeployment,
   };
 }

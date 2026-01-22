@@ -3,21 +3,19 @@
 import { useState } from "react";
 import { AlertCircle, Loader2, LogOut } from "lucide-react";
 import { usePrivy } from "@privy-io/react-auth";
-import type { BaseAppDebugInfo, BaseAppDeploymentStatus } from "@/hooks/useSmartAccount";
+import type { BaseAppDeploymentStatus } from "@/hooks/useSmartAccount";
 import { TOKENS } from "@/config/constants";
 import Modal from "@/components/Modal";
 
 interface ActivationModalProps {
   onActivate: () => Promise<void>;
   status: string;
-  baseAppDebug: BaseAppDebugInfo | null;
   baseAppDeployment: BaseAppDeploymentStatus | null;
 }
 
 export default function ActivationModal({
   onActivate,
   status,
-  baseAppDebug,
   baseAppDeployment,
 }: ActivationModalProps) {
   const [isActivating, setIsActivating] = useState(false);
@@ -104,43 +102,21 @@ export default function ActivationModal({
           </div>
         </div>
 
-        {baseAppDeployment && (
+        {baseAppDeployment?.status === "missing" && (
           <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-amber-200 text-xs">
-            <div className="text-sm font-semibold">
-              Base App wallet on chain
-            </div>
+            <div className="text-sm font-semibold">Base App wallet not deployed</div>
             <div className="mt-1">
               Address:{" "}
               <span className="break-all">{baseAppDeployment.address}</span>
             </div>
-            <div className="mt-1">
-              Chain ID: {baseAppDeployment.chainId}
-            </div>
+            <div className="mt-1">Chain ID: {baseAppDeployment.chainId}</div>
             <div className="mt-1">
               RPC: <span className="break-all">{baseAppDeployment.rpcUrl}</span>
             </div>
-            {baseAppDeployment.status === "missing" && (
-              <div className="mt-2 text-amber-100">
-                Wallet belum ter-deploy di chain ini. Lakukan 1 transaksi di
-                Base App pada chain ini, lalu coba aktivasi lagi.
-              </div>
-            )}
-            {baseAppDeployment.status === "deployed" && (
-              <div className="mt-2 text-amber-100">
-                Wallet terdeteksi on-chain (code bytes:{" "}
-                {baseAppDeployment.codeLength ?? 0}).
-              </div>
-            )}
-            {baseAppDeployment.status === "checking" && (
-              <div className="mt-2 text-amber-100">
-                Checking deployment status...
-              </div>
-            )}
-            {baseAppDeployment.status === "unknown" && (
-              <div className="mt-2 text-amber-100">
-                Gagal cek status wallet. Coba refresh.
-              </div>
-            )}
+            <div className="mt-2 text-amber-100">
+              Deploy your Base App wallet on this chain by sending one
+              transaction, then retry activation.
+            </div>
           </div>
         )}
 
@@ -159,16 +135,6 @@ export default function ActivationModal({
             <div className="p-3 bg-red-500/20 border border-red-500 rounded-lg text-red-400 text-sm text-center">
               {error}
             </div>
-            {baseAppDebug && (
-              <details className="rounded-lg border border-zinc-700 bg-zinc-900/60 p-3 text-left">
-                <summary className="cursor-pointer text-xs font-semibold text-zinc-200">
-                  Debug (Base App)
-                </summary>
-                <pre className="mt-2 text-[10px] leading-snug text-zinc-400 whitespace-pre-wrap break-all">
-                  {JSON.stringify(baseAppDebug, null, 2)}
-                </pre>
-              </details>
-            )}
           </div>
         )}
 
@@ -218,14 +184,6 @@ export default function ActivationModal({
           title={errorModal.title}
           message={errorModal.message}
         >
-          {baseAppDebug && (
-            <div className="mb-4 rounded-lg border border-zinc-700 bg-zinc-900/60 p-3 text-left">
-              <div className="text-xs font-semibold text-zinc-200">Debug</div>
-              <pre className="mt-2 text-[10px] leading-snug text-zinc-400 whitespace-pre-wrap break-all">
-                {JSON.stringify(baseAppDebug, null, 2)}
-              </pre>
-            </div>
-          )}
           {errorModal.onRetry && (
             <button
               onClick={() => {
