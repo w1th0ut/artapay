@@ -70,7 +70,7 @@ export function useSmartAccount() {
   // isReady = true when: not authenticated OR smartAccountAddress is set
   const isReady = !authenticated || !!smartAccountAddress;
 
-  // Pick Privy wallet: embedded only (ensure embedded is provisioned via Privy config)
+  // Pick Privy wallet: prefer Base Account/external wallets, fallback to embedded
   useEffect(() => {
     let cancelled = false;
 
@@ -83,10 +83,24 @@ export function useSmartAccount() {
         return;
       }
 
-      const embedded = wallets.find(
-        (w) => w.type === "ethereum" && w.walletClientType === "privy",
+      const ethereumWallets = wallets.filter((w) => w.type === "ethereum");
+      const getWalletKey = (w: any) =>
+        String(w.walletClientType || w.connectorType || "").toLowerCase();
+      const isBaseAccount = (w: any) =>
+        ["base_account", "base"].includes(getWalletKey(w));
+      const isCoinbaseWallet = (w: any) =>
+        ["coinbase_wallet", "coinbase"].includes(getWalletKey(w));
+
+      const baseAccount = ethereumWallets.find(isBaseAccount);
+      const coinbaseWallet = ethereumWallets.find(isCoinbaseWallet);
+      const external = ethereumWallets.find((w) => {
+        const key = getWalletKey(w);
+        return key && key !== "privy";
+      });
+      const embedded = ethereumWallets.find(
+        (w) => w.walletClientType === "privy",
       );
-      const chosen = embedded; // force embedded-only
+      const chosen = baseAccount || coinbaseWallet || external || embedded;
 
       if (!chosen) {
         if (cancelled) return;
@@ -94,7 +108,7 @@ export function useSmartAccount() {
         setEoaAddress(null);
         setWalletSource(null);
         setStatus(
-          "No embedded wallet found. Enable embedded wallet (createOnLogin) in Privy and re-login.",
+          "No wallet found. Connect a wallet or enable embedded wallet (createOnLogin) in Privy and re-login.",
         );
         return;
       }
