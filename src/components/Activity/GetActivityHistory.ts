@@ -39,16 +39,10 @@ const MAX_LOOKBACK_BLOCKS = BigInt(env.activityLookbackBlocks);
 const MAX_CHUNKS = 20;
 
 type LogWithArgs = Awaited<ReturnType<typeof publicClient.getLogs>>[number] & {
-  args?: Record<string, unknown>;
+  args?: Record<string, unknown> | readonly unknown[];
 };
 
-type TransferLog = LogWithArgs & {
-  args?: {
-    from?: Address;
-    to?: Address;
-    value?: bigint;
-  };
-};
+type TransferLog = LogWithArgs;
 
 type TokenTransferLog = {
   log: TransferLog;
@@ -90,6 +84,40 @@ const getLogsSafe = async (
     ]);
     return [...left, ...right];
   }
+};
+
+const getTransferArgs = (
+  log: LogWithArgs
+): { from?: Address; to?: Address; value?: bigint } | undefined => {
+  if (!log.args || Array.isArray(log.args)) return undefined;
+  return log.args as {
+    from?: Address;
+    to?: Address;
+    value?: bigint;
+  };
+};
+
+const getPaymentArgs = (
+  log: LogWithArgs
+):
+  | {
+      recipient: Address;
+      payer: Address;
+      requestedToken: Address;
+      payToken: Address;
+      requestedAmount: bigint;
+      paidAmount: bigint;
+    }
+  | undefined => {
+  if (!log.args || Array.isArray(log.args)) return undefined;
+  return log.args as {
+    recipient: Address;
+    payer: Address;
+    requestedToken: Address;
+    payToken: Address;
+    requestedAmount: bigint;
+    paidAmount: bigint;
+  };
 };
 
 /**
@@ -135,8 +163,9 @@ export async function fetchActivityHistory(
     >();
 
     for (const entry of transferLogs) {
-      const from = (entry.log.args?.from as string | undefined)?.toLowerCase();
-      const to = (entry.log.args?.to as string | undefined)?.toLowerCase();
+      const args = getTransferArgs(entry.log);
+      const from = (args?.from as string | undefined)?.toLowerCase();
+      const to = (args?.to as string | undefined)?.toLowerCase();
       const txHash = entry.log.transactionHash as string | undefined;
       if (!txHash) continue;
 
@@ -167,11 +196,13 @@ export async function fetchActivityHistory(
       swapLogIds.add(inLogId);
 
       const timestamp = await getBlockDate(pair.out.log.blockNumber);
+      const outArgs = getTransferArgs(pair.out.log);
+      const inArgs = getTransferArgs(pair.in.log);
       const amountIn = Number(
-        formatUnits(pair.out.log.args?.value || 0n, pair.out.token.decimals)
+        formatUnits(outArgs?.value || 0n, pair.out.token.decimals)
       );
       const amountOut = Number(
-        formatUnits(pair.in.log.args?.value || 0n, pair.in.token.decimals)
+        formatUnits(inArgs?.value || 0n, pair.in.token.decimals)
       );
 
       const activityId = `${txHash}-swap`;
@@ -196,14 +227,8 @@ export async function fetchActivityHistory(
       if (entry.log.blockNumber == null || !entry.log.transactionHash) {
         continue;
       }
-      const args = entry.log.args as {
-        recipient: Address;
-        payer: Address;
-        requestedToken: Address;
-        payToken: Address;
-        requestedAmount: bigint;
-        paidAmount: bigint;
-      };
+      const args = getPaymentArgs(entry.log);
+      if (!args) continue;
 
       const timestamp = await getBlockDate(entry.log.blockNumber);
       const logId = `${entry.log.transactionHash}-${entry.log.logIndex}-payment-${entry.role}`;
@@ -261,8 +286,9 @@ export async function fetchActivityHistory(
       if (processedLogIds.has(logId)) continue;
       processedLogIds.add(logId);
 
-      const from = (entry.log.args?.from as string | undefined)?.toLowerCase();
-      const to = (entry.log.args?.to as string | undefined)?.toLowerCase();
+      const args = getTransferArgs(entry.log);
+      const from = (args?.from as string | undefined)?.toLowerCase();
+      const to = (args?.to as string | undefined)?.toLowerCase();
       const counterparty = entry.direction === "send" ? to : from;
 
       if (
@@ -275,7 +301,7 @@ export async function fetchActivityHistory(
 
       const timestamp = await getBlockDate(entry.log.blockNumber);
       const amount = Number(
-        formatUnits(entry.log.args?.value || 0n, entry.token.decimals)
+        formatUnits(args?.value || 0n, entry.token.decimals)
       );
 
       chunkActivities.push({
@@ -287,8 +313,8 @@ export async function fetchActivityHistory(
         currency: entry.token.symbol,
         currencyIcon: entry.token.icon,
         txHash: entry.log.transactionHash,
-        fromAddress: entry.log.args?.from as Address | undefined,
-        toAddress: entry.log.args?.to as Address | undefined,
+        fromAddress: args?.from as Address | undefined,
+        toAddress: args?.to as Address | undefined,
       });
     }
 
