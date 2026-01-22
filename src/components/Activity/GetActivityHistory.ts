@@ -33,7 +33,8 @@ const tokenInfoMap = new Map(
 );
 
 const MAX_ACTIVITIES = 10;
-const MAX_BLOCK_RANGE = 100000n;
+const MAX_BLOCK_RANGE = 20000n;
+const MIN_BLOCK_RANGE = 2000n;
 const MAX_LOOKBACK_BLOCKS = BigInt(env.activityLookbackBlocks);
 const MAX_CHUNKS = 20;
 
@@ -58,6 +59,37 @@ type TokenTransferLog = {
 type PaymentLog = {
   log: LogWithArgs;
   role: "payer" | "recipient";
+};
+
+type GetLogsParams = Parameters<typeof publicClient.getLogs>[0];
+
+const getLogsSafe = async (
+  params: Omit<GetLogsParams, "fromBlock" | "toBlock">,
+  fromBlock: bigint,
+  toBlock: bigint
+): Promise<Awaited<ReturnType<typeof publicClient.getLogs>>> => {
+  try {
+    return await publicClient.getLogs({ ...params, fromBlock, toBlock } as any);
+  } catch (err) {
+    if (toBlock <= fromBlock) {
+      return [];
+    }
+    const range = toBlock - fromBlock;
+    if (range <= MIN_BLOCK_RANGE) {
+      console.warn("getLogs failed for small range:", {
+        fromBlock: fromBlock.toString(),
+        toBlock: toBlock.toString(),
+        error: err,
+      });
+      return [];
+    }
+    const mid = fromBlock + range / 2n;
+    const [left, right] = await Promise.all([
+      getLogsSafe(params, fromBlock, mid),
+      getLogsSafe(params, mid + 1n, toBlock),
+    ]);
+    return [...left, ...right];
+  }
 };
 
 /**
@@ -287,12 +319,15 @@ export async function fetchActivityHistory(
         Promise.all(
           TOKENS.map(async (token) => {
             try {
-              const logs = await publicClient.getLogs({
-                address: token.address as Address,
-                event: transferEventAbi,
-                args: { from: address },
-                ...range,
-              });
+              const logs = await getLogsSafe(
+                {
+                  address: token.address as Address,
+                  event: transferEventAbi,
+                  args: { from: address },
+                },
+                range.fromBlock,
+                range.toBlock
+              );
               return logs.map((log) => ({
                 log,
                 token,
@@ -310,12 +345,15 @@ export async function fetchActivityHistory(
         Promise.all(
           TOKENS.map(async (token) => {
             try {
-              const logs = await publicClient.getLogs({
-                address: token.address as Address,
-                event: transferEventAbi,
-                args: { to: address },
-                ...range,
-              });
+              const logs = await getLogsSafe(
+                {
+                  address: token.address as Address,
+                  event: transferEventAbi,
+                  args: { to: address },
+                },
+                range.fromBlock,
+                range.toBlock
+              );
               return logs.map((log) => ({
                 log,
                 token,
@@ -335,25 +373,29 @@ export async function fetchActivityHistory(
       const transferLogs = [...sentByToken.flat(), ...receivedByToken.flat()];
 
       const [paymentByPayer, paymentByRecipient] = await Promise.all([
-        publicClient
-          .getLogs({
+        getLogsSafe(
+          {
             address: PAYMENT_PROCESSOR_ADDRESS as Address,
             event: paymentCompletedEventAbi,
             args: { payer: address },
-            ...range,
-          })
+          },
+          range.fromBlock,
+          range.toBlock
+        )
           .then((logs) => logs.map((log) => ({ log, role: "payer" as const })))
           .catch((err) => {
             console.warn("Failed to fetch payment logs (payer):", err);
             return [];
           }),
-        publicClient
-          .getLogs({
+        getLogsSafe(
+          {
             address: PAYMENT_PROCESSOR_ADDRESS as Address,
             event: paymentCompletedEventAbi,
             args: { recipient: address },
-            ...range,
-          })
+          },
+          range.fromBlock,
+          range.toBlock
+        )
           .then((logs) =>
             logs.map((log) => ({ log, role: "recipient" as const }))
           )

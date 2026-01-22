@@ -146,7 +146,6 @@ export default function BalanceDisplay() {
   };
 
   const displayBalance = () => {
-    if (isLoading) return "...";
     return formatBalance(balances[selectedToken.symbol]);
   };
 
