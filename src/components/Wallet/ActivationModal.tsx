@@ -16,7 +16,7 @@ export default function ActivationModal({
 }: ActivationModalProps) {
   const [isActivating, setIsActivating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { status } = useSmartAccount();
+  const { status, baseAppDebug } = useSmartAccount();
   const { logout } = usePrivy();
 
   // Error modal state for critical errors
@@ -161,6 +161,14 @@ export default function ActivationModal({
           title={errorModal.title}
           message={errorModal.message}
         >
+          {baseAppDebug && (
+            <div className="mb-4 rounded-lg border border-zinc-700 bg-zinc-900/60 p-3 text-left">
+              <div className="text-xs font-semibold text-zinc-200">Debug</div>
+              <pre className="mt-2 text-[10px] leading-snug text-zinc-400 whitespace-pre-wrap break-all">
+                {JSON.stringify(baseAppDebug, null, 2)}
+              </pre>
+            </div>
+          )}
           {errorModal.onRetry && (
             <button
               onClick={() => {

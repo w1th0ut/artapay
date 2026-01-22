@@ -52,6 +52,24 @@ function transformError(err: unknown): string {
   return message;
 }
 
+type BaseAppDebugInfo = {
+  mode: "base_account";
+  time: string;
+  chainId: number;
+  verifyingContract: Address;
+  eoaAddress: Address;
+  messageHash: `0x${string}`;
+  typedDataHash: `0x${string}`;
+  signatureMethod: "typedData" | "signMessage";
+  signatureByteLength?: number;
+  rawSignature?: `0x${string}`;
+  wrappedSignature0?: `0x${string}`;
+  wrappedSignature1?: `0x${string}`;
+  candidates?: { signature: `0x${string}`; ownerIndex?: number; valid: boolean }[];
+  selectedSignature?: `0x${string}`;
+  error?: string;
+};
+
 export function useSmartAccount() {
   const { wallets, ready: privyReady } = useWallets();
   const { authenticated } = usePrivy();
@@ -69,6 +87,7 @@ export function useSmartAccount() {
   const [isLoading, setIsLoading] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true); // Track initial loading
   const [error, setError] = useState<string | null>(null);
+  const [baseAppDebug, setBaseAppDebug] = useState<BaseAppDebugInfo | null>(null);
   const [client, setClient] = useState<ReturnType<
     typeof createSmartAccountClient
   > | null>(null);
@@ -271,29 +290,94 @@ export function useSmartAccount() {
         )) as `0x${string}`;
         const candidates: `0x${string}`[] = [rawSig];
         const sigByteLength = (rawSig.length - 2) / 2;
-        if (sigByteLength <= 65) {
-          candidates.push(wrapBaseAccountSignature(rawSig, 0n));
-          candidates.push(wrapBaseAccountSignature(rawSig, 1n));
-        }
+        const wrapped0 =
+          sigByteLength <= 65 ? wrapBaseAccountSignature(rawSig, 0n) : undefined;
+        const wrapped1 =
+          sigByteLength <= 65 ? wrapBaseAccountSignature(rawSig, 1n) : undefined;
+        if (wrapped0) candidates.push(wrapped0);
+        if (wrapped1) candidates.push(wrapped1);
+
+        const results: {
+          signature: `0x${string}`;
+          ownerIndex?: number;
+          valid: boolean;
+        }[] = [];
+        let selected: `0x${string}` | null = null;
         for (const candidate of candidates) {
-          if (await validateSignature(candidate)) {
-            return candidate;
+          const valid = await validateSignature(candidate);
+          const ownerIndex =
+            candidate === wrapped0 ? 0 : candidate === wrapped1 ? 1 : undefined;
+          results.push({ signature: candidate, ownerIndex, valid });
+          if (!selected && valid) {
+            selected = candidate;
           }
         }
-        return wrapBaseAccountSignature(rawSig, 0n);
+
+        setBaseAppDebug({
+          mode: "base_account",
+          time: new Date().toISOString(),
+          chainId: BASE_SEPOLIA.id,
+          verifyingContract: eoaAddress,
+          eoaAddress,
+          messageHash: hash,
+          typedDataHash: typedDigest,
+          signatureMethod: "typedData",
+          signatureByteLength: sigByteLength,
+          rawSignature: rawSig,
+          wrappedSignature0: wrapped0,
+          wrappedSignature1: wrapped1,
+          candidates: results,
+          selectedSignature: selected ?? rawSig,
+        });
+
+        return selected ?? wrapBaseAccountSignature(rawSig, 0n);
       } catch (err) {
         console.warn("Base Account typed data sign failed, falling back", err);
         const rawSig = (await effectiveWalletClient.signMessage({
           message,
         } as any)) as `0x${string}`;
-        if (await validateSignature(rawSig)) {
-          return rawSig;
+        const sigByteLength = (rawSig.length - 2) / 2;
+        const wrapped0 =
+          sigByteLength <= 65 ? wrapBaseAccountSignature(rawSig, 0n) : undefined;
+        const wrapped1 =
+          sigByteLength <= 65 ? wrapBaseAccountSignature(rawSig, 1n) : undefined;
+        const candidates: `0x${string}`[] = [rawSig];
+        if (wrapped0) candidates.push(wrapped0);
+        if (wrapped1) candidates.push(wrapped1);
+        const results: {
+          signature: `0x${string}`;
+          ownerIndex?: number;
+          valid: boolean;
+        }[] = [];
+        let selected: `0x${string}` | null = null;
+        for (const candidate of candidates) {
+          const valid = await validateSignature(candidate);
+          const ownerIndex =
+            candidate === wrapped0 ? 0 : candidate === wrapped1 ? 1 : undefined;
+          results.push({ signature: candidate, ownerIndex, valid });
+          if (!selected && valid) {
+            selected = candidate;
+          }
         }
-        if (await validateSignature(wrapBaseAccountSignature(rawSig, 0n))) {
-          return wrapBaseAccountSignature(rawSig, 0n);
-        }
-        if (await validateSignature(wrapBaseAccountSignature(rawSig, 1n))) {
-          return wrapBaseAccountSignature(rawSig, 1n);
+        setBaseAppDebug({
+          mode: "base_account",
+          time: new Date().toISOString(),
+          chainId: BASE_SEPOLIA.id,
+          verifyingContract: eoaAddress,
+          eoaAddress,
+          messageHash: hash,
+          typedDataHash: typedDigest,
+          signatureMethod: "signMessage",
+          signatureByteLength: sigByteLength,
+          rawSignature: rawSig,
+          wrappedSignature0: wrapped0,
+          wrappedSignature1: wrapped1,
+          candidates: results,
+          selectedSignature: selected ?? rawSig,
+          error: err instanceof Error ? err.message : String(err),
+        });
+        if (selected) {
+          return selected;
         }
         return wrapBaseAccountSignature(rawSig, 0n);
       }
@@ -1224,5 +1308,6 @@ export function useSmartAccount() {
     payInvoice,
     payMultiTokenInvoice,
     signMessageWithEOA,
+    baseAppDebug,
   };
 }
