@@ -7,6 +7,7 @@ import {
   createPublicClient,
   createWalletClient,
   custom,
+  decodeAbiParameters,
   getAddress,
   hashTypedData,
   http,
@@ -288,14 +289,42 @@ export function useSmartAccount() {
         const rawSig = (await (effectiveWalletClient as any).signTypedData(
           typedData,
         )) as `0x${string}`;
-        const candidates: `0x${string}`[] = [rawSig];
+        const candidatesSet = new Set<`0x${string}`>();
+        const addCandidate = (value?: `0x${string}`) => {
+          if (value) {
+            candidatesSet.add(value);
+          }
+        };
+        const tryDecodeBytes = (value: `0x${string}`) => {
+          try {
+            const [inner] = decodeAbiParameters(
+              [{ name: "signature", type: "bytes" }],
+              value,
+            );
+            const innerSig = inner as `0x${string}`;
+            if (innerSig && innerSig !== value) {
+              addCandidate(innerSig);
+            }
+          } catch {
+            // ignore decode errors
+          }
+        };
+
+        addCandidate(rawSig);
+        tryDecodeBytes(rawSig);
         const sigByteLength = (rawSig.length - 2) / 2;
         const wrapped0 =
           sigByteLength <= 65 ? wrapBaseAccountSignature(rawSig, 0n) : undefined;
         const wrapped1 =
           sigByteLength <= 65 ? wrapBaseAccountSignature(rawSig, 1n) : undefined;
-        if (wrapped0) candidates.push(wrapped0);
-        if (wrapped1) candidates.push(wrapped1);
+        addCandidate(wrapped0);
+        addCandidate(wrapped1);
+
+        // If we decoded a nested signature, try decoding one more layer.
+        for (const candidate of Array.from(candidatesSet)) {
+          tryDecodeBytes(candidate);
+        }
+        const candidates = Array.from(candidatesSet);
 
         const results: {
           signature: `0x${string}`;
@@ -341,9 +370,34 @@ export function useSmartAccount() {
           sigByteLength <= 65 ? wrapBaseAccountSignature(rawSig, 0n) : undefined;
         const wrapped1 =
           sigByteLength <= 65 ? wrapBaseAccountSignature(rawSig, 1n) : undefined;
-        const candidates: `0x${string}`[] = [rawSig];
-        if (wrapped0) candidates.push(wrapped0);
-        if (wrapped1) candidates.push(wrapped1);
+        const candidatesSet = new Set<`0x${string}`>();
+        const addCandidate = (value?: `0x${string}`) => {
+          if (value) {
+            candidatesSet.add(value);
+          }
+        };
+        const tryDecodeBytes = (value: `0x${string}`) => {
+          try {
+            const [inner] = decodeAbiParameters(
+              [{ name: "signature", type: "bytes" }],
+              value,
+            );
+            const innerSig = inner as `0x${string}`;
+            if (innerSig && innerSig !== value) {
+              addCandidate(innerSig);
+            }
+          } catch {
+            // ignore decode errors
+          }
+        };
+        addCandidate(rawSig);
+        tryDecodeBytes(rawSig);
+        addCandidate(wrapped0);
+        addCandidate(wrapped1);
+        for (const candidate of Array.from(candidatesSet)) {
+          tryDecodeBytes(candidate);
+        }
+        const candidates = Array.from(candidatesSet);
         const results: {
           signature: `0x${string}`;
           ownerIndex?: number;
