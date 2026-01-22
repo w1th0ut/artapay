@@ -1,13 +1,17 @@
 # ArtaPay Frontend
-Frontend web app for the ArtaPay dApp built with Next.js that provides wallet onboarding, QR payments, swaps, and activity views for Base Sepolia.
+Frontend web app for the ArtaPay dApp built with Next.js that provides wallet onboarding, QR payments, swaps, top up IDRX or USDC via IDRX API and activity views for Base Sepolia.
 
 ## Overview
 ArtaPay Frontend provides:
 
-- **Wallet + Smart Account Onboarding**: Privy auth and ERC-4337 smart accounts
+- **Wallet + Smart Account Onboarding**: Privy auth, Base App login, ERC-4337 smart accounts
+- **Gasless Activation**: One-time approval for multi-token paymaster sponsorship
+- **Send & Receive**: Single transfer, batch transfer, and multi-token payments
+- **ENS Support**: Send to Base mainnet ENS names (via mainnet RPC resolver)
 - **QR Payments**: Scan and generate payment requests
-- **Stablecoin Swaps**: Quote and prepare swaps via StableSwap
-- **Activity Views**: Recent transactions and payment receipts
+- **Stablecoin Swaps**: Quote and execute swaps via StableSwap
+- **IDRX Top Up**: IDRX API integration for top-up flow
+- **Activity Views**: Recent transfers and payment receipts
 - **Configurable Network + Tokens**: Chain, contract, and token metadata via env
 
 ## Architecture
@@ -22,21 +26,21 @@ Main UI under `src/app` with layouts and routes.
 - SSR/CSR support via Next.js
 
 #### 2. **Web3 Provider** - Wallet + Chain Context
-Wraps wagmi/viem configuration and smart account hooks.
+Wraps viem configuration and smart account hooks.
 
 **Key Features:**
 
 - Chain and contract config from env
-- Smart account initialization
-- Privy-based login (optional)
+- Smart account initialization + paymaster flow
+- Privy-based login with Base App wallet support
 
 #### 3. **API Clients** - Backend + On-chain Helpers
-Frontend calls the backend signer and swap helpers.
+Frontend calls the backend signer and IDRX helpers.
 
 **Key Features:**
 
 - Signer API integration for paymaster data
-- Swap quote + calldata retrieval
+- IDRX top-up requests (server-side API keys)
 
 #### 4. **Feature Modules** - Payments + Swap UI
 Composable UI for payments, swaps, and activity.
@@ -44,7 +48,7 @@ Composable UI for payments, swaps, and activity.
 **Key Features:**
 
 - QR scan and generate flows
-- Send/receive and swap views
+- Send/receive (single + batch) and swap views
 - Activity list and receipts
 
 ## Fee Structure
@@ -75,45 +79,56 @@ npm install
 Create a `.env` file in the root directory:
 
 ```bash
-# =====================================================
-# FRONTEND CONFIGURATION
-# =====================================================
-
-# Network
 NEXT_PUBLIC_CHAIN_ID=84532
 NEXT_PUBLIC_CHAIN_NAME=Base Sepolia
 NEXT_PUBLIC_RPC_URL=https://sepolia.base.org
+NEXT_PUBLIC_MAINNET_RPC_URL=https://0xrpc.io/eth
 NEXT_PUBLIC_BLOCK_EXPLORER_NAME=Blockscout
 NEXT_PUBLIC_BLOCK_EXPLORER_URL=https://base-sepolia.blockscout.com
 NEXT_PUBLIC_NATIVE_CURRENCY_NAME=Ether
 NEXT_PUBLIC_NATIVE_CURRENCY_SYMBOL=ETH
 NEXT_PUBLIC_NATIVE_CURRENCY_DECIMALS=18
 
-# Services
 GELATO_API_KEY=
+NEXT_PUBLIC_ENTRY_POINT_ADDRESS=
+NEXT_PUBLIC_SIMPLE_ACCOUNT_FACTORY=
+NEXT_PUBLIC_PAYMASTER_ADDRESS=
+NEXT_PUBLIC_STABLE_SWAP_ADDRESS=
+NEXT_PUBLIC_PAYMENT_PROCESSOR_ADDRESS=
+NEXT_PUBLIC_STABLECOIN_REGISTRY_ADDRESS=
+
 NEXT_PUBLIC_SIGNER_API_URL=http://localhost:3001
 NEXT_PUBLIC_PRIVY_APP_ID=
 
-# Contracts
-NEXT_PUBLIC_ENTRY_POINT_ADDRESS=0x0000000071727De22E5E9d8BAf0edAc6f37da032
-NEXT_PUBLIC_SIMPLE_ACCOUNT_FACTORY=<DEPLOYED_ADDRESS>
-NEXT_PUBLIC_PAYMASTER_ADDRESS=<DEPLOYED_ADDRESS>
-NEXT_PUBLIC_STABLE_SWAP_ADDRESS=<DEPLOYED_ADDRESS>
-NEXT_PUBLIC_PAYMENT_PROCESSOR_ADDRESS=<DEPLOYED_ADDRESS>
-
-# Tokens (repeat for all supported stablecoins)
 NEXT_PUBLIC_DEFAULT_TOKEN_SYMBOL=USDC
-NEXT_PUBLIC_TOKEN_USDC_ADDRESS=<DEPLOYED_ADDRESS>
+NEXT_PUBLIC_TOKEN_USDC_ADDRESS=
 NEXT_PUBLIC_TOKEN_USDC_DECIMALS=6
+NEXT_PUBLIC_TOKEN_USDS_ADDRESS=
+NEXT_PUBLIC_TOKEN_USDS_DECIMALS=6
+NEXT_PUBLIC_TOKEN_EURC_ADDRESS=
+NEXT_PUBLIC_TOKEN_EURC_DECIMALS=6
+NEXT_PUBLIC_TOKEN_BRZ_ADDRESS=
+NEXT_PUBLIC_TOKEN_BRZ_DECIMALS=6
+NEXT_PUBLIC_TOKEN_AUDD_ADDRESS=
+NEXT_PUBLIC_TOKEN_AUDD_DECIMALS=6
+NEXT_PUBLIC_TOKEN_CADC_ADDRESS=
+NEXT_PUBLIC_TOKEN_CADC_DECIMALS=6
+NEXT_PUBLIC_TOKEN_ZCHF_ADDRESS=
+NEXT_PUBLIC_TOKEN_ZCHF_DECIMALS=6
+NEXT_PUBLIC_TOKEN_TGBP_ADDRESS=
+NEXT_PUBLIC_TOKEN_TGBP_DECIMALS=18
+NEXT_PUBLIC_TOKEN_IDRX_ADDRESS=
+NEXT_PUBLIC_TOKEN_IDRX_DECIMALS=6
 
-# Activity
 NEXT_PUBLIC_ACTIVITY_LOOKBACK_BLOCKS=200000
+
+IDRX_API_KEY=
+IDRX_SECRET_KEY=
+IDRX_BASE_URL=https://idrx.co/api
+IDRX_NETWORK_CHAIN_ID=
 ```
 
 Note: Use `.env.example` for the full list of token variables.
-
-## Testing
-No automated tests are included yet.
 
 ## Deployment
 ### Run Locally (Dev)
@@ -142,6 +157,10 @@ npm run start
 - **Block Explorer**: https://base-sepolia.blockscout.com
 - **EntryPoint v0.7**: `0x0000000071727De22E5E9d8BAf0edAc6f37da032`
 
+### ENS Resolution
+
+- ENS lookups use `NEXT_PUBLIC_MAINNET_RPC_URL` (Base mainnet).
+
 ## Supported Stablecoins
 
 | Symbol | Name               | Decimals | Region |
@@ -161,16 +180,28 @@ npm run start
 
 ```
 EntryPoint:            0x0000000071727De22E5E9d8BAf0edAc6f37da032
-SimpleAccountFactory:  <DEPLOYED_ADDRESS>
-Paymaster:             <DEPLOYED_ADDRESS>
-StableSwap:            <DEPLOYED_ADDRESS>
-PaymentProcessor:      <DEPLOYED_ADDRESS>
+StablecoinRegistry:    0x573f4D2b5e9E5157693a9Cc0008FcE4e7167c584
+Paymaster:             0x1b14BF9ab47069a77c70Fb0ac02Bcb08A9Ffe290
+StableSwap:            0x822e1dfb7bf410249b2bE39809A5Ae0cbfae612f
+PaymentProcessor:      0x4D053b241a91c4d8Cd86D0815802F69D34a0164B
+SimpleAccountFactory:  0xfEA9DD0034044C330c0388756Fd643A5015d94D2
+
+Mock Tokens:
+  USDC:  0x74FB067E49CBd0f97Dc296919e388CB3CFB62b4D
+  USDS:  0x79f3293099e96b840A0423B58667Bc276Ea19aC0
+  EURC:  0xfF4dD486832201F6DC41126b541E3b47DC353438
+  BRZ:   0x9d30F685C04f024f84D9A102d0fE8dF348aE7E7d
+  AUDD:  0x9f6b8aF49747304Ce971e2b9d131B2bcd1841d83
+  CADC:  0x6BB3FFD9279fBE76FE0685Df7239c23488bC96e4
+  ZCHF:  0xF27edF22FD76A044eA5B77E1958863cf9A356132
+  tGBP:  0xb4db79424725256a6E6c268fc725979b24171857
+  IDRX:  0x34976B6c7Aebe7808c7Cab34116461EB381Bc2F8
 ```
 
 ## Security Considerations
 
 - **Public Env Vars**: `NEXT_PUBLIC_*` values are exposed to the browser. Do not put secrets here.
-- **API Keys**: Use restricted API keys for client-side services.
+- **API Keys**: `IDRX_*` values are server-side only; do not expose them in `NEXT_PUBLIC_*`.
 - **Network Mismatch**: Keep contract addresses aligned with the selected chain.
 - **QR Validation**: Validate and sanitize QR payloads before use.
 
