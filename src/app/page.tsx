@@ -1,6 +1,6 @@
 "use client";
 
-import { useRef, useLayoutEffect } from 'react';
+import { useRef, useLayoutEffect, useEffect } from 'react';
 import { gsap } from 'gsap';
 import { ScrollTrigger } from 'gsap/ScrollTrigger';
 import { StaggeredMenu } from '@/components/StaggeredMenu';
@@ -9,10 +9,12 @@ import TechStack from '@/components/TechStack/TechStack';
 import { Footer } from '@/components/Footer';
 import { AnimatedHero } from '@/components/Hero';
 import ScrollStack, { ScrollStackItem } from '@/components/ScrollStack';
+import { sdk } from '@farcaster/miniapp-sdk';
 
-import SendFeature from '@/assets/Send_Feature_Scan.png';
-import ReceiveFeature from '@/assets/Receive_Feature.png';
-import SwapFeature from '@/assets/Swap_Feature.png';
+// Image paths from public folder
+const SendFeature = '/assets/Send_Feature_Scan.png';
+const ReceiveFeature = '/assets/Receive_Feature.png';
+const SwapFeature = '/assets/Swap_Feature.png';
 
 // Register ScrollTrigger plugin
 if (typeof window !== "undefined") {
@@ -44,6 +46,11 @@ export default function Home() {
       document.documentElement.style.scrollBehavior = '';
     };
   }, []);
+
+  useEffect(() => {
+    sdk.actions.ready();
+  }, []);
+
 
   useLayoutEffect(() => {
     const ctx = gsap.context(() => {
@@ -125,17 +132,17 @@ export default function Home() {
           useWindowScroll={true}
         >
           <ScrollStackItem
-            image={SendFeature.src}
+            image={SendFeature}
             label="Send to Anyone"
             description="Send stablecoin to any recipient with scan QR or Address."
           />
           <ScrollStackItem
-            image={ReceiveFeature.src}
+            image={ReceiveFeature}
             label="Receive from Anyone"
             description="Accept global payments with minimal fees."
           />
           <ScrollStackItem
-            image={SwapFeature.src}
+            image={SwapFeature}
             label="Swap to Anything"
             description="Swap to any stablecoin you need in one step."
           />

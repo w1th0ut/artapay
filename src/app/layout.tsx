@@ -2,7 +2,8 @@ import type { Metadata } from "next";
 import { Poppins, Cinzel } from "next/font/google";
 import "./globals.css";
 import Web3Provider from "@/providers/Web3Provider";
-import banner from "@/assets/banner.png";
+import banner from "../../../public/assets/banner.png";
+import { minikitConfig } from "../../minikit.config";
 
 const poppins = Poppins({
   variable: "--font-poppins",
@@ -18,22 +19,38 @@ const cinzel = Cinzel({
   display: "swap",
 });
 
-export const metadata: Metadata = {
-  title: "ArtaPay - Seamless Cross-Border Payments",
-  description: "Any Stablecoin. Anywhere. Gasless.",
-  metadataBase: new URL("https://artapay.vercel.app"),
-  openGraph: {
-    title: "ArtaPay - Seamless Cross-Border Payments",
-    description: "Any Stablecoin. Anywhere. Gasless.",
-    type: "website",
-    images: [
-      {
-        url: banner.src,
-        alt: "ArtaPay banner",
-      },
-    ],
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  return {
+    title: minikitConfig.miniapp.name,
+    description: minikitConfig.miniapp.description,
+    metadataBase: new URL(minikitConfig.miniapp.homeUrl),
+    openGraph: {
+      title: minikitConfig.miniapp.ogTitle || minikitConfig.miniapp.name,
+      description: minikitConfig.miniapp.ogDescription || minikitConfig.miniapp.description,
+      type: "website",
+      images: [
+        {
+          url: banner.src,
+          alt: "ArtaPay banner",
+        },
+      ],
+    },
+    other: {
+      "base:app_id": "6971d44f88e3bac59cf3d313",
+      "fc:frame": JSON.stringify({
+        version: minikitConfig.miniapp.version,
+        imageUrl: minikitConfig.miniapp.heroImageUrl,
+        button: {
+          title: `Launch ${minikitConfig.miniapp.name}`,
+          action: {
+            name: `Launch ${minikitConfig.miniapp.name}`,
+            type: "launch_frame",
+          },
+        },
+      }),
+    },
+  };
+}
 
 export default function RootLayout({
   children,
