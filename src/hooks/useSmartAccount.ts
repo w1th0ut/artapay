@@ -260,7 +260,10 @@ export function useSmartAccount() {
       };
       const typedDigest = hashTypedData(typedData as any);
 
-      const validateSignature = async (sig: `0x${string}`, hashToCheck: `0x${string}`) => {
+      const validateSignature = async (
+        sig: `0x${string}`,
+        hashToCheck: `0x${string}`,
+      ) => {
         try {
           const magic = await publicClient.readContract({
             address: eoaAddress,
@@ -290,6 +293,7 @@ export function useSmartAccount() {
           typedData,
         )) as `0x${string}`;
         const candidatesSet = new Set<`0x${string}`>();
+        const candidateOwnerIndex = new Map<`0x${string}`, number>();
         const addCandidate = (value?: `0x${string}`) => {
           if (value) {
             candidatesSet.add(value);
@@ -313,10 +317,34 @@ export function useSmartAccount() {
         addCandidate(rawSig);
         tryDecodeBytes(rawSig);
         const sigByteLength = (rawSig.length - 2) / 2;
-        const wrapped0 = wrapBaseAccountSignature(rawSig, 0n);
-        const wrapped1 = wrapBaseAccountSignature(rawSig, 1n);
-        addCandidate(wrapped0);
-        addCandidate(wrapped1);
+        let ownerIndexMax = 5;
+        try {
+          const nextOwnerIndex = (await publicClient.readContract({
+            address: eoaAddress,
+            abi: [
+              {
+                type: "function",
+                name: "nextOwnerIndex",
+                stateMutability: "view",
+                inputs: [],
+                outputs: [{ name: "index", type: "uint256" }],
+              },
+            ],
+            functionName: "nextOwnerIndex",
+          })) as bigint;
+          const maxIndex = Number(nextOwnerIndex);
+          if (Number.isFinite(maxIndex) && maxIndex > 0) {
+            ownerIndexMax = Math.min(Math.max(maxIndex - 1, 0), 10);
+          }
+        } catch {
+          ownerIndexMax = 5;
+        }
+
+        for (let i = 0; i <= ownerIndexMax; i += 1) {
+          const wrapped = wrapBaseAccountSignature(rawSig, BigInt(i));
+          addCandidate(wrapped);
+          candidateOwnerIndex.set(wrapped, i);
+        }
 
         // If we decoded a nested signature, try decoding one more layer.
         for (const candidate of Array.from(candidatesSet)) {
@@ -361,8 +389,7 @@ export function useSmartAccount() {
         let selected: `0x${string}` | null = null;
         for (const candidate of candidates) {
           const valid = await validateSignature(candidate, typedDigest);
-          const ownerIndex =
-            candidate === wrapped0 ? 0 : candidate === wrapped1 ? 1 : undefined;
+          const ownerIndex = candidateOwnerIndex.get(candidate);
           results.push({ signature: candidate, ownerIndex, valid });
           if (!selected && valid) {
             selected = candidate;
@@ -401,24 +428,22 @@ export function useSmartAccount() {
           signatureByteLength: sigByteLength,
           rawSignature: rawSig,
           decodedWrapper,
-          wrappedSignature0: wrapped0,
-          wrappedSignature1: wrapped1,
           hashChecks,
           replaySafeHash,
           candidates: results,
           selectedSignature: selected ?? rawSig,
         });
 
-        return selected ?? wrapped0;
+        const fallbackIndex = candidateOwnerIndex.values().next().value;
+        return selected ?? wrapBaseAccountSignature(rawSig, BigInt(fallbackIndex ?? 0));
       } catch (err) {
         console.warn("Base Account typed data sign failed, falling back", err);
         const rawSig = (await effectiveWalletClient.signMessage({
           message,
         } as any)) as `0x${string}`;
         const sigByteLength = (rawSig.length - 2) / 2;
-        const wrapped0 = wrapBaseAccountSignature(rawSig, 0n);
-        const wrapped1 = wrapBaseAccountSignature(rawSig, 1n);
         const candidatesSet = new Set<`0x${string}`>();
+        const candidateOwnerIndex = new Map<`0x${string}`, number>();
         const addCandidate = (value?: `0x${string}`) => {
           if (value) {
             candidatesSet.add(value);
@@ -440,8 +465,33 @@ export function useSmartAccount() {
         };
         addCandidate(rawSig);
         tryDecodeBytes(rawSig);
-        addCandidate(wrapped0);
-        addCandidate(wrapped1);
+        let ownerIndexMax = 5;
+        try {
+          const nextOwnerIndex = (await publicClient.readContract({
+            address: eoaAddress,
+            abi: [
+              {
+                type: "function",
+                name: "nextOwnerIndex",
+                stateMutability: "view",
+                inputs: [],
+                outputs: [{ name: "index", type: "uint256" }],
+              },
+            ],
+            functionName: "nextOwnerIndex",
+          })) as bigint;
+          const maxIndex = Number(nextOwnerIndex);
+          if (Number.isFinite(maxIndex) && maxIndex > 0) {
+            ownerIndexMax = Math.min(Math.max(maxIndex - 1, 0), 10);
+          }
+        } catch {
+          ownerIndexMax = 5;
+        }
+        for (let i = 0; i <= ownerIndexMax; i += 1) {
+          const wrapped = wrapBaseAccountSignature(rawSig, BigInt(i));
+          addCandidate(wrapped);
+          candidateOwnerIndex.set(wrapped, i);
+        }
         for (const candidate of Array.from(candidatesSet)) {
           tryDecodeBytes(candidate);
         }
@@ -483,8 +533,7 @@ export function useSmartAccount() {
         let selected: `0x${string}` | null = null;
         for (const candidate of candidates) {
           const valid = await validateSignature(candidate, typedDigest);
-          const ownerIndex =
-            candidate === wrapped0 ? 0 : candidate === wrapped1 ? 1 : undefined;
+          const ownerIndex = candidateOwnerIndex.get(candidate);
           results.push({ signature: candidate, ownerIndex, valid });
           if (!selected && valid) {
             selected = candidate;
@@ -522,8 +571,6 @@ export function useSmartAccount() {
           signatureByteLength: sigByteLength,
           rawSignature: rawSig,
           decodedWrapper,
-          wrappedSignature0: wrapped0,
-          wrappedSignature1: wrapped1,
           hashChecks,
           replaySafeHash,
           candidates: results,
@@ -533,7 +580,8 @@ export function useSmartAccount() {
         if (selected) {
           return selected;
         }
-        return wrapped0;
+        const fallbackIndex = candidateOwnerIndex.values().next().value;
+        return wrapBaseAccountSignature(rawSig, BigInt(fallbackIndex ?? 0));
       }
     };
 
