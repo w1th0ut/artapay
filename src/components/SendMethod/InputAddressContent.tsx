@@ -7,19 +7,49 @@ import Modal from "@/components/Modal";
 import { ReceiptPopUp, ReceiptData } from "@/components/ReceiptPopUp";
 import { useSmartAccount } from "@/hooks/useSmartAccount";
 import { BASE_SEPOLIA } from "@/config/chains";
+import { env } from "@/config/env";
 import {
   createPublicClient,
   http,
   formatUnits,
   getAddress,
+  isAddress,
   type Address,
 } from "viem";
+import { mainnet } from "viem/chains";
 import { ERC20_ABI } from "@/config/abi";
 
 const publicClient = createPublicClient({
   chain: BASE_SEPOLIA,
   transport: http(BASE_SEPOLIA.rpcUrls.default.http[0]),
 });
+
+const ensPublicClient = createPublicClient({
+  chain: mainnet,
+  transport: env.mainnetRpcUrl ? http(env.mainnetRpcUrl) : http(),
+});
+
+const isEnsName = (value: string) => {
+  const trimmed = value.trim();
+  return trimmed.length > 0 && !trimmed.startsWith("0x") && trimmed.includes(".");
+};
+
+const resolveRecipientAddress = async (value: string): Promise<Address> => {
+  const trimmed = value.trim();
+  if (isAddress(trimmed)) {
+    return getAddress(trimmed) as Address;
+  }
+  if (!isEnsName(trimmed)) {
+    throw new Error("Invalid address or ENS name");
+  }
+  const resolved = await ensPublicClient.getEnsAddress({
+    name: trimmed.toLowerCase(),
+  });
+  if (!resolved) {
+    throw new Error(`ENS name not found: ${trimmed}`);
+  }
+  return resolved;
+};
 
 interface SendFormData {
   currency: Currency;
@@ -175,14 +205,15 @@ export default function InputAddressContent({
     batchRecipients.forEach((r, idx) => {
       // Check address
       if (r.address.trim()) {
-        try {
-          getAddress(r.address);
-          if (addresses.includes(r.address.toLowerCase())) {
+        const trimmed = r.address.trim();
+        if (isAddress(trimmed)) {
+          const normalized = trimmed.toLowerCase();
+          if (addresses.includes(normalized)) {
             errors.push(`Duplicate address at row ${idx + 1}`);
           }
-          addresses.push(r.address.toLowerCase());
-        } catch {
-          errors.push(`Invalid address at row ${idx + 1}`);
+          addresses.push(normalized);
+        } else if (!isEnsName(trimmed)) {
+          errors.push(`Invalid address or ENS name at row ${idx + 1}`);
         }
       }
 
@@ -227,13 +258,24 @@ export default function InputAddressContent({
         return;
       }
 
+      let recipient: Address;
+      try {
+        recipient = await resolveRecipientAddress(address);
+      } catch (err) {
+        setErrorModal({
+          isOpen: true,
+          title: "Validation Error",
+          message: err instanceof Error ? err.message : "Invalid address",
+        });
+        return;
+      }
+
       setIsSubmitting(true);
 
       try {
         if (onSend) {
-          await onSend({ currency, address, amount: amountValue });
+          await onSend({ currency, address: recipient, amount: amountValue });
         } else {
-          const recipient = getAddress(address) as Address;
           const txHash = await sendGaslessTransfer({
             recipient,
             amount: amountValue.toString(),
@@ -324,12 +366,47 @@ export default function InputAddressContent({
       setIsSubmitting(true);
 
       try {
-        const validRecipients = batchRecipients
-          .filter((r) => r.address.trim() && parseFloat(r.amount) > 0)
-          .map((r) => ({
-            address: getAddress(r.address) as Address,
-            amount: r.amount,
-          }));
+        const recipientInputs = batchRecipients
+          .map((r, idx) => ({ ...r, index: idx }))
+          .filter((r) => r.address.trim() && parseFloat(r.amount) > 0);
+
+        const resolvedRecipients = await Promise.all(
+          recipientInputs.map(async (r) => {
+            try {
+              const resolvedAddress = await resolveRecipientAddress(r.address);
+              return { ...r, resolvedAddress };
+            } catch (err) {
+              const message =
+                err instanceof Error ? err.message : "Invalid address";
+              throw new Error(`Row ${r.index + 1}: ${message}`);
+            }
+          }),
+        );
+
+        const seen = new Set<string>();
+        const duplicateErrors: string[] = [];
+        resolvedRecipients.forEach((r) => {
+          const key = r.resolvedAddress.toLowerCase();
+          if (seen.has(key)) {
+            duplicateErrors.push(`Duplicate address at row ${r.index + 1}`);
+          } else {
+            seen.add(key);
+          }
+        });
+
+        if (duplicateErrors.length > 0) {
+          setErrorModal({
+            isOpen: true,
+            title: "Validation Error",
+            message: duplicateErrors.join("\n"),
+          });
+          return;
+        }
+
+        const validRecipients = resolvedRecipients.map((r) => ({
+          address: r.resolvedAddress as Address,
+          amount: r.amount,
+        }));
 
         const result = await sendBatchTransfer({
           recipients: validRecipients,
@@ -454,7 +531,7 @@ export default function InputAddressContent({
                     onChange={(e) =>
                       updateRecipient(recipient.id, "address", e.target.value)
                     }
-                    placeholder="0x... address"
+                    placeholder="0x... or name.base.eth"
                     className="flex-1 p-2 bg-zinc-700 border border-zinc-600 rounded-lg text-white text-sm placeholder-zinc-500 focus:outline-none focus:border-primary"
                   />
                   <input
@@ -577,7 +654,7 @@ export default function InputAddressContent({
                 type="text"
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
-                placeholder="Enter wallet address"
+                placeholder="Enter wallet address or ENS"
                 className="w-full p-4 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-primary transition-colors"
               />
             </div>

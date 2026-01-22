@@ -10,10 +10,12 @@ import {
   getAddress,
   http,
   type Address,
+  encodeAbiParameters,
   encodeFunctionData,
   maxUint256,
   parseUnits,
 } from "viem";
+import { toAccount } from "viem/accounts";
 import { createSmartAccountClient } from "permissionless";
 import { toSimpleSmartAccount } from "permissionless/accounts";
 import { BASE_SEPOLIA } from "@/config/chains";
@@ -56,6 +58,7 @@ export function useSmartAccount() {
   const [walletSource, setWalletSource] = useState<
     "external" | "embedded" | null
   >(null);
+  const [isBaseAccountWallet, setIsBaseAccountWallet] = useState(false);
   const [effectiveWalletClient, setEffectiveWalletClient] = useState<ReturnType<
     typeof createWalletClient
   > | null>(null);
@@ -70,7 +73,7 @@ export function useSmartAccount() {
   // isReady = true when: not authenticated OR smartAccountAddress is set
   const isReady = !authenticated || !!smartAccountAddress;
 
-  // Pick Privy wallet: embedded only (ensure embedded is provisioned via Privy config)
+  // Pick Privy wallet: prefer Base Account/external wallets, fallback to embedded
   useEffect(() => {
     let cancelled = false;
 
@@ -83,10 +86,23 @@ export function useSmartAccount() {
         return;
       }
 
-      const embedded = wallets.find(
-        (w) => w.type === "ethereum" && w.walletClientType === "privy",
+      const ethereumWallets = wallets.filter((w) => w.type === "ethereum");
+      const getWalletKey = (w: any) =>
+        String(w.walletClientType || w.connectorType || "").toLowerCase();
+      const isBaseAccount = (w: any) =>
+        ["base_account", "base"].includes(getWalletKey(w));
+      const isCoinbaseWallet = (w: any) =>
+        ["coinbase_wallet", "coinbase"].includes(getWalletKey(w));
+
+      const baseAccount = ethereumWallets.find(isBaseAccount);
+      const external = ethereumWallets.find((w) => {
+        const key = getWalletKey(w);
+        return key && key !== "privy" && !isBaseAccount(w);
+      });
+      const embedded = ethereumWallets.find(
+        (w) => w.walletClientType === "privy",
       );
-      const chosen = embedded; // force embedded-only
+      const chosen = baseAccount || embedded || external || ethereumWallets[0];
 
       if (!chosen) {
         if (cancelled) return;
@@ -94,7 +110,7 @@ export function useSmartAccount() {
         setEoaAddress(null);
         setWalletSource(null);
         setStatus(
-          "No embedded wallet found. Enable embedded wallet (createOnLogin) in Privy and re-login.",
+          "No wallet found. Connect a wallet or enable embedded wallet (createOnLogin) in Privy and re-login.",
         );
         return;
       }
@@ -102,6 +118,7 @@ export function useSmartAccount() {
       try {
         const provider = await chosen.getEthereumProvider();
         const addr = getAddress(chosen.address) as Address;
+        const walletKey = getWalletKey(chosen);
         const account = { address: addr, type: "json-rpc" as const };
         const createClientAny = createWalletClient as any;
         const privyWalletClient = createClientAny({
@@ -115,12 +132,16 @@ export function useSmartAccount() {
         setWalletSource(
           chosen.walletClientType === "privy" ? "embedded" : "external",
         );
+        setIsBaseAccountWallet(
+          ["base_account", "base"].includes(String(walletKey || "").toLowerCase()),
+        );
       } catch (err) {
         console.error("Failed to init Privy wallet", err);
         if (!cancelled) {
           setEffectiveWalletClient(null);
           setEoaAddress(null);
           setWalletSource(null);
+          setIsBaseAccountWallet(false);
         }
       }
     };
@@ -138,8 +159,53 @@ export function useSmartAccount() {
       setClient(null);
       setStatus("");
       setError(null);
+      setIsBaseAccountWallet(false);
     }
   }, [effectiveWalletClient, eoaAddress]);
+
+  const wrapBaseAccountSignature = useCallback((signature: `0x${string}`) => {
+    const byteLength = (signature.length - 2) / 2;
+    if (byteLength <= 65) {
+      return encodeAbiParameters(
+        [
+          { name: "ownerIndex", type: "uint256" },
+          { name: "signatureData", type: "bytes" },
+        ],
+        [0n, signature],
+      ) as `0x${string}`;
+    }
+    return signature;
+  }, []);
+
+  const getSmartAccountOwner = useCallback(() => {
+    if (!effectiveWalletClient || !eoaAddress) return null;
+    if (!isBaseAccountWallet) {
+      return effectiveWalletClient;
+    }
+    return toAccount({
+      address: eoaAddress,
+      async signMessage({ message }) {
+        const sig = await effectiveWalletClient.signMessage({
+          message,
+        } as any);
+        return wrapBaseAccountSignature(sig as `0x${string}`);
+      },
+      async signTypedData(typedData) {
+        const sig = await (effectiveWalletClient as any).signTypedData(
+          typedData as any,
+        );
+        return wrapBaseAccountSignature(sig as `0x${string}`);
+      },
+      async signTransaction(_) {
+        throw new Error("Smart account signer doesn't sign transactions");
+      },
+    });
+  }, [
+    effectiveWalletClient,
+    eoaAddress,
+    isBaseAccountWallet,
+    wrapBaseAccountSignature,
+  ]);
 
   // Auto-initialize Smart Account when EOA wallet is ready
   useEffect(() => {
@@ -158,12 +224,14 @@ export function useSmartAccount() {
 
       try {
         setStatus("Auto-initializing Smart Account...");
+        const owner = getSmartAccountOwner();
+        if (!owner) return;
         const simpleAccount = await toSimpleSmartAccount({
           client: createPublicClient({
             chain: BASE_SEPOLIA,
             transport: http(BASE_SEPOLIA.rpcUrls.default.http[0]),
           }),
-          owner: effectiveWalletClient,
+          owner,
           entryPoint: { address: ENTRY_POINT_ADDRESS, version: "0.7" as const },
           factoryAddress: SIMPLE_ACCOUNT_FACTORY,
         });
@@ -192,7 +260,7 @@ export function useSmartAccount() {
     return () => {
       cancelled = true;
     };
-  }, [effectiveWalletClient, eoaAddress, smartAccountAddress, client]);
+  }, [effectiveWalletClient, eoaAddress, smartAccountAddress, client, getSmartAccountOwner]);
 
   const publicClient = useMemo(
     () =>
@@ -296,14 +364,15 @@ export function useSmartAccount() {
       return { client, address: smartAccountAddress };
     }
 
-    if (!effectiveWalletClient || !eoaAddress) {
+    const owner = getSmartAccountOwner();
+    if (!owner || !eoaAddress) {
       throw new Error("Connect EOA wallet first");
     }
 
     setStatus("Preparing smart account...");
     const simpleAccount = await toSimpleSmartAccount({
       client: publicClient,
-      owner: effectiveWalletClient,
+      owner,
       entryPoint: { address: ENTRY_POINT_ADDRESS, version: "0.7" as const },
       factoryAddress: SIMPLE_ACCOUNT_FACTORY,
     });
@@ -317,13 +386,7 @@ export function useSmartAccount() {
     setSmartAccountAddress(simpleAccount.address);
     setClient(smartAccountClient);
     return { client: smartAccountClient, address: simpleAccount.address };
-  }, [
-    client,
-    smartAccountAddress,
-    effectiveWalletClient,
-    eoaAddress,
-    publicClient,
-  ]);
+  }, [client, smartAccountAddress, getSmartAccountOwner, eoaAddress, publicClient]);
 
   const approvePaymaster = useCallback(
     async (tokenAddresses: Address[]) => {

@@ -40,8 +40,14 @@ export default function Web3Provider({ children }: Web3ProviderProps) {
       appId={privyAppId}
       config={{
         loginMethods: ["wallet", "email", "google"],
-        appearance: { theme: "dark" },
-        embeddedWallets: { createOnLogin: "all-users" },
+        appearance: {
+          theme: "dark",
+          walletList: ["base_account", "metamask", "rabby_wallet"],
+          showWalletLoginFirst: true,
+        },
+        embeddedWallets: {
+          ethereum: { createOnLogin: "all-users" },
+        },
         externalWallets: {},
       }}
     >
