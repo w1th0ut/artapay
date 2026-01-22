@@ -52,7 +52,7 @@ function transformError(err: unknown): string {
   return message;
 }
 
-type BaseAppDebugInfo = {
+export type BaseAppDebugInfo = {
   mode: "base_account";
   time: string;
   chainId: number;

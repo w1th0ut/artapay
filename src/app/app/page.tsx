@@ -33,7 +33,8 @@ export default function Start() {
   const [activeMenu, setActiveMenu] = useState<MenuType>("send");
   const [isHydrated, setIsHydrated] = useState(false);
 
-  const { smartAccountAddress, approvePaymaster } = useSmartAccount();
+  const { smartAccountAddress, approvePaymaster, status, baseAppDebug } =
+    useSmartAccount();
   const { isApproved, isChecking, refresh } = useApprovalStatus(
     smartAccountAddress
   );
@@ -112,6 +113,8 @@ export default function Start() {
       {showActivationModal && smartAccountAddress && (
         <ActivationModal
           onActivate={handleActivate}
+          status={status}
+          baseAppDebug={baseAppDebug}
         />
       )}
     </div>

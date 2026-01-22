@@ -3,20 +3,23 @@
 import { useState } from "react";
 import { AlertCircle, Loader2, LogOut } from "lucide-react";
 import { usePrivy } from "@privy-io/react-auth";
-import { useSmartAccount } from "@/hooks/useSmartAccount";
+import type { BaseAppDebugInfo } from "@/hooks/useSmartAccount";
 import { TOKENS } from "@/config/constants";
 import Modal from "@/components/Modal";
 
 interface ActivationModalProps {
   onActivate: () => Promise<void>;
+  status: string;
+  baseAppDebug: BaseAppDebugInfo | null;
 }
 
 export default function ActivationModal({
   onActivate,
+  status,
+  baseAppDebug,
 }: ActivationModalProps) {
   const [isActivating, setIsActivating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { status, baseAppDebug } = useSmartAccount();
   const { logout } = usePrivy();
 
   // Error modal state for critical errors
