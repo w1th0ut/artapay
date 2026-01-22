@@ -14,6 +14,8 @@ import {
   encodeFunctionData,
   maxUint256,
   parseUnits,
+  stringToHex,
+  toHex,
 } from "viem";
 import { toAccount } from "viem/accounts";
 import { createSmartAccountClient } from "permissionless";
@@ -182,19 +184,57 @@ export function useSmartAccount() {
     if (!isBaseAccountWallet) {
       return effectiveWalletClient;
     }
+
+    const toRawMessageHex = (message: any): `0x${string}` => {
+      if (typeof message === "string") {
+        return stringToHex(message);
+      }
+      if (message?.raw instanceof Uint8Array) {
+        return toHex(message.raw);
+      }
+      if (typeof message?.raw === "string") {
+        return message.raw;
+      }
+      return toHex(message);
+    };
+
+    const signBaseAccountMessage = async (message: any) => {
+      const hash = toRawMessageHex(message);
+      const typedData = {
+        domain: {
+          name: "Coinbase Smart Wallet",
+          version: "1",
+          chainId: BASE_SEPOLIA.id,
+          verifyingContract: eoaAddress,
+        },
+        types: {
+          CoinbaseSmartWalletMessage: [{ name: "hash", type: "bytes32" }],
+        },
+        primaryType: "CoinbaseSmartWalletMessage",
+        message: { hash },
+      };
+
+      try {
+        return await (effectiveWalletClient as any).signTypedData(typedData);
+      } catch (err) {
+        console.warn("Base Account typed data sign failed, falling back", err);
+        return await effectiveWalletClient.signMessage({
+          message,
+        } as any);
+      }
+    };
+
     return toAccount({
       address: eoaAddress,
       async signMessage({ message }) {
-        const sig = await effectiveWalletClient.signMessage({
-          message,
-        } as any);
-        return wrapBaseAccountSignature(sig as `0x${string}`);
+        const sig = (await signBaseAccountMessage(message)) as `0x${string}`;
+        return wrapBaseAccountSignature(sig);
       },
       async signTypedData(typedData) {
-        const sig = await (effectiveWalletClient as any).signTypedData(
+        const sig = (await (effectiveWalletClient as any).signTypedData(
           typedData as any,
-        );
-        return wrapBaseAccountSignature(sig as `0x${string}`);
+        )) as `0x${string}`;
+        return wrapBaseAccountSignature(sig);
       },
       async signTransaction(_) {
         throw new Error("Smart account signer doesn't sign transactions");
