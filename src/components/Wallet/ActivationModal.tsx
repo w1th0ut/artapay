@@ -5,6 +5,7 @@ import { AlertCircle, Loader2, LogOut } from "lucide-react";
 import { usePrivy } from "@privy-io/react-auth";
 import type { BaseAppDeploymentStatus } from "@/hooks/useSmartAccount";
 import { TOKENS } from "@/config/constants";
+import { BASE_SEPOLIA } from "@/config/chains";
 import Modal from "@/components/Modal";
 
 interface ActivationModalProps {
@@ -21,6 +22,7 @@ export default function ActivationModal({
   const [isActivating, setIsActivating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { logout } = usePrivy();
+  const isBaseAppNotReady = baseAppDeployment?.status === "missing";
 
   // Error modal state for critical errors
   const [errorModal, setErrorModal] = useState<{
@@ -102,20 +104,13 @@ export default function ActivationModal({
           </div>
         </div>
 
-        {baseAppDeployment?.status === "missing" && (
+        {isBaseAppNotReady && (
           <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-amber-200 text-xs">
-            <div className="text-sm font-semibold">Base App wallet not deployed</div>
-            <div className="mt-1">
-              Address:{" "}
-              <span className="break-all">{baseAppDeployment.address}</span>
-            </div>
-            <div className="mt-1">Chain ID: {baseAppDeployment.chainId}</div>
-            <div className="mt-1">
-              RPC: <span className="break-all">{baseAppDeployment.rpcUrl}</span>
-            </div>
+            <div className="text-sm font-semibold">Base App wallet not ready</div>
             <div className="mt-2 text-amber-100">
-              Deploy your Base App wallet on this chain by sending one
-              transaction, then retry activation.
+              Your Base App wallet needs to be activated on {BASE_SEPOLIA.name}.
+              Open Base App, send one transaction on {BASE_SEPOLIA.name}, then
+              retry activation here.
             </div>
           </div>
         )}
@@ -141,7 +136,7 @@ export default function ActivationModal({
         {/* Activate Button */}
         <button
           onClick={handleActivate}
-          disabled={isActivating}
+          disabled={isActivating || isBaseAppNotReady}
           className="w-full py-3 sm:py-4 bg-primary text-black font-bold text-lg sm:text-xl rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isActivating ? (

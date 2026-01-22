@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import Image from "next/image";
 import { Eye, EyeOff, ChevronDown, Loader2 } from "lucide-react";
 import { useSmartAccount } from "@/hooks/useSmartAccount";
@@ -69,47 +69,55 @@ export default function BalanceDisplay() {
     }
   };
 
+  const fetchSelectedBalance = useCallback(async () => {
+    if (!smartAccountAddress) {
+      setBalances({});
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const rawBalance = await publicClient.readContract({
+        address: selectedToken.address as Address,
+        abi: ERC20_ABI,
+        functionName: "balanceOf",
+        args: [smartAccountAddress],
+      });
+
+      const formatted = formatUnits(
+        rawBalance as bigint,
+        selectedToken.decimals
+      );
+      setBalances((prev) => ({ ...prev, [selectedToken.symbol]: formatted }));
+    } catch (err) {
+      console.error("Failed to fetch balance:", err);
+      setBalances((prev) => ({ ...prev, [selectedToken.symbol]: "0" }));
+      setErrorModal({
+        isOpen: true,
+        title: "Balance Error",
+        message: err instanceof Error ? err.message : "Failed to fetch balance",
+        onRetry: () => {
+          setErrorModal((prev) => ({ ...prev, isOpen: false }));
+        },
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  }, [smartAccountAddress, selectedToken]);
+
   // Fetch selected token balance on mount and when token changes
   useEffect(() => {
-    const fetchBalance = async () => {
-      if (!smartAccountAddress) {
-        setBalances({});
-        return;
-      }
+    fetchSelectedBalance();
+  }, [fetchSelectedBalance]);
 
-      setIsLoading(true);
-      try {
-        const rawBalance = await publicClient.readContract({
-          address: selectedToken.address as Address,
-          abi: ERC20_ABI,
-          functionName: "balanceOf",
-          args: [smartAccountAddress],
-        });
-
-        const formatted = formatUnits(
-          rawBalance as bigint,
-          selectedToken.decimals
-        );
-        setBalances((prev) => ({ ...prev, [selectedToken.symbol]: formatted }));
-      } catch (err) {
-        console.error("Failed to fetch balance:", err);
-        setBalances((prev) => ({ ...prev, [selectedToken.symbol]: "0" }));
-        setErrorModal({
-          isOpen: true,
-          title: "Balance Error",
-          message: err instanceof Error ? err.message : "Failed to fetch balance",
-          onRetry: () => {
-            setErrorModal({ ...errorModal, isOpen: false });
-            // Trigger refetch by updating a dependency
-          },
-        });
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    fetchBalance();
-  }, [smartAccountAddress, selectedToken]);
+  // Auto-refresh selected token balance
+  useEffect(() => {
+    if (!smartAccountAddress) return;
+    const interval = setInterval(() => {
+      fetchSelectedBalance();
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [smartAccountAddress, fetchSelectedBalance]);
 
   // Fetch all balances when dropdown opens
   useEffect(() => {
