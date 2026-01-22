@@ -187,13 +187,19 @@ export function useSmartAccount() {
 
     const toRawMessageHex = (message: any): `0x${string}` => {
       if (typeof message === "string") {
+        if (message.startsWith("0x")) {
+          return message as `0x${string}`;
+        }
         return stringToHex(message);
       }
       if (message?.raw instanceof Uint8Array) {
         return toHex(message.raw);
       }
       if (typeof message?.raw === "string") {
-        return message.raw;
+        if (message.raw.startsWith("0x")) {
+          return message.raw as `0x${string}`;
+        }
+        return stringToHex(message.raw);
       }
       return toHex(message);
     };
