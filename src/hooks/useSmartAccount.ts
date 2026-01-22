@@ -201,8 +201,6 @@ export function useSmartAccount() {
 
   const wrapBaseAccountSignature = useCallback(
     (signature: `0x${string}`, ownerIndex: bigint = 0n) => {
-    const byteLength = (signature.length - 2) / 2;
-    if (byteLength <= 65) {
       return encodeAbiParameters(
         [
           { name: "ownerIndex", type: "uint256" },
@@ -210,8 +208,6 @@ export function useSmartAccount() {
         ],
         [ownerIndex, signature],
       ) as `0x${string}`;
-    }
-    return signature;
     },
     [],
   );
@@ -317,10 +313,8 @@ export function useSmartAccount() {
         addCandidate(rawSig);
         tryDecodeBytes(rawSig);
         const sigByteLength = (rawSig.length - 2) / 2;
-        const wrapped0 =
-          sigByteLength <= 65 ? wrapBaseAccountSignature(rawSig, 0n) : undefined;
-        const wrapped1 =
-          sigByteLength <= 65 ? wrapBaseAccountSignature(rawSig, 1n) : undefined;
+        const wrapped0 = wrapBaseAccountSignature(rawSig, 0n);
+        const wrapped1 = wrapBaseAccountSignature(rawSig, 1n);
         addCandidate(wrapped0);
         addCandidate(wrapped1);
 
@@ -415,17 +409,15 @@ export function useSmartAccount() {
           selectedSignature: selected ?? rawSig,
         });
 
-        return selected ?? wrapBaseAccountSignature(rawSig, 0n);
+        return selected ?? wrapped0;
       } catch (err) {
         console.warn("Base Account typed data sign failed, falling back", err);
         const rawSig = (await effectiveWalletClient.signMessage({
           message,
         } as any)) as `0x${string}`;
         const sigByteLength = (rawSig.length - 2) / 2;
-        const wrapped0 =
-          sigByteLength <= 65 ? wrapBaseAccountSignature(rawSig, 0n) : undefined;
-        const wrapped1 =
-          sigByteLength <= 65 ? wrapBaseAccountSignature(rawSig, 1n) : undefined;
+        const wrapped0 = wrapBaseAccountSignature(rawSig, 0n);
+        const wrapped1 = wrapBaseAccountSignature(rawSig, 1n);
         const candidatesSet = new Set<`0x${string}`>();
         const addCandidate = (value?: `0x${string}`) => {
           if (value) {
@@ -541,21 +533,19 @@ export function useSmartAccount() {
         if (selected) {
           return selected;
         }
-        return wrapBaseAccountSignature(rawSig, 0n);
+        return wrapped0;
       }
     };
 
     return toAccount({
       address: eoaAddress,
       async signMessage({ message }) {
-        const sig = (await signBaseAccountMessage(message)) as `0x${string}`;
-        return wrapBaseAccountSignature(sig);
+        return (await signBaseAccountMessage(message)) as `0x${string}`;
       },
       async signTypedData(typedData) {
-        const sig = (await (effectiveWalletClient as any).signTypedData(
+        return (await (effectiveWalletClient as any).signTypedData(
           typedData as any,
         )) as `0x${string}`;
-        return wrapBaseAccountSignature(sig);
       },
       async signTransaction(_) {
         throw new Error("Smart account signer doesn't sign transactions");
