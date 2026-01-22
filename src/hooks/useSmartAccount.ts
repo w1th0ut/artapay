@@ -95,16 +95,14 @@ export function useSmartAccount() {
         ["coinbase_wallet", "coinbase"].includes(getWalletKey(w));
 
       const baseAccount = ethereumWallets.find(isBaseAccount);
-      const coinbaseWallet = ethereumWallets.find(isCoinbaseWallet);
       const external = ethereumWallets.find((w) => {
         const key = getWalletKey(w);
-        return key && key !== "privy";
+        return key && key !== "privy" && !isBaseAccount(w);
       });
       const embedded = ethereumWallets.find(
         (w) => w.walletClientType === "privy",
       );
-      const chosen =
-        baseAccount || coinbaseWallet || external || embedded || ethereumWallets[0];
+      const chosen = baseAccount || embedded || external || ethereumWallets[0];
 
       if (!chosen) {
         if (cancelled) return;
