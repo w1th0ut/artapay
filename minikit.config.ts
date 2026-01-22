@@ -23,7 +23,7 @@ export const minikitConfig = {
       `${ROOT_URL}/assets/Receive_Feature.png`,
       `${ROOT_URL}/assets/Swap_Feature.png`
     ],
-    iconUrl: `${ROOT_URL}/logo.svg`,
+    iconUrl: `${ROOT_URL}/logoPolos.png`,
     splashImageUrl: `${ROOT_URL}/assets/banner.png`,
     splashBackgroundColor: "#000000",
     homeUrl: ROOT_URL,
