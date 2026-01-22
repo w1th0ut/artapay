@@ -23,6 +23,7 @@ export const env = {
     "NEXT_PUBLIC_CHAIN_NAME",
   ),
   rpcUrl: requireEnv(process.env.NEXT_PUBLIC_RPC_URL, "NEXT_PUBLIC_RPC_URL"),
+  mainnetRpcUrl: process.env.NEXT_PUBLIC_MAINNET_RPC_URL,
   blockExplorerName: requireEnv(
     process.env.NEXT_PUBLIC_BLOCK_EXPLORER_NAME,
     "NEXT_PUBLIC_BLOCK_EXPLORER_NAME",
