@@ -2,7 +2,6 @@ import type { Metadata } from "next";
 import { Poppins, Cinzel } from "next/font/google";
 import "./globals.css";
 import Web3Provider from "@/providers/Web3Provider";
-import banner from "../../../public/assets/banner.png";
 import { minikitConfig } from "../../minikit.config";
 
 const poppins = Poppins({
@@ -30,7 +29,7 @@ export async function generateMetadata(): Promise<Metadata> {
       type: "website",
       images: [
         {
-          url: banner.src,
+          url: "/assets/banner.png",
           alt: "ArtaPay banner",
         },
       ],
