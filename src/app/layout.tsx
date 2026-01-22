@@ -47,6 +47,20 @@ export async function generateMetadata(): Promise<Metadata> {
           },
         },
       }),
+      "fc:miniapp": JSON.stringify({
+        version: "next",
+        imageUrl: minikitConfig.miniapp.heroImageUrl,
+        button: {
+          title: `Launch ${minikitConfig.miniapp.name}`,
+          action: {
+            type: "launch_miniapp",
+            name: minikitConfig.miniapp.name,
+            url: minikitConfig.miniapp.homeUrl,
+            splashImageUrl: minikitConfig.miniapp.splashImageUrl,
+            splashBackgroundColor: minikitConfig.miniapp.splashBackgroundColor,
+          },
+        },
+      }),
     },
   };
 }
