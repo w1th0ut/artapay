@@ -110,8 +110,20 @@ export default function ActivationModal({
 
         {/* Error Message */}
         {error && (
-          <div className="p-3 bg-red-500/20 border border-red-500 rounded-lg text-red-400 text-sm text-center">
-            {error}
+          <div className="space-y-3">
+            <div className="p-3 bg-red-500/20 border border-red-500 rounded-lg text-red-400 text-sm text-center">
+              {error}
+            </div>
+            {baseAppDebug && (
+              <details className="rounded-lg border border-zinc-700 bg-zinc-900/60 p-3 text-left">
+                <summary className="cursor-pointer text-xs font-semibold text-zinc-200">
+                  Debug (Base App)
+                </summary>
+                <pre className="mt-2 text-[10px] leading-snug text-zinc-400 whitespace-pre-wrap break-all">
+                  {JSON.stringify(baseAppDebug, null, 2)}
+                </pre>
+              </details>
+            )}
           </div>
         )}
 
