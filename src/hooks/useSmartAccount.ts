@@ -8,6 +8,7 @@ import {
   createWalletClient,
   custom,
   getAddress,
+  hashTypedData,
   http,
   type Address,
   encodeAbiParameters,
@@ -71,6 +72,15 @@ export function useSmartAccount() {
   const [client, setClient] = useState<ReturnType<
     typeof createSmartAccountClient
   > | null>(null);
+
+  const publicClient = useMemo(
+    () =>
+      createPublicClient({
+        chain: BASE_SEPOLIA,
+        transport: http(BASE_SEPOLIA.rpcUrls.default.http[0]),
+      }),
+    [],
+  );
 
   // isReady = true when: not authenticated OR smartAccountAddress is set
   const isReady = !authenticated || !!smartAccountAddress;
@@ -165,7 +175,8 @@ export function useSmartAccount() {
     }
   }, [effectiveWalletClient, eoaAddress]);
 
-  const wrapBaseAccountSignature = useCallback((signature: `0x${string}`) => {
+  const wrapBaseAccountSignature = useCallback(
+    (signature: `0x${string}`, ownerIndex: bigint = 0n) => {
     const byteLength = (signature.length - 2) / 2;
     if (byteLength <= 65) {
       return encodeAbiParameters(
@@ -173,11 +184,13 @@ export function useSmartAccount() {
           { name: "ownerIndex", type: "uint256" },
           { name: "signatureData", type: "bytes" },
         ],
-        [0n, signature],
+        [ownerIndex, signature],
       ) as `0x${string}`;
     }
     return signature;
-  }, []);
+    },
+    [],
+  );
 
   const getSmartAccountOwner = useCallback(() => {
     if (!effectiveWalletClient || !eoaAddress) return null;
@@ -214,19 +227,75 @@ export function useSmartAccount() {
           verifyingContract: eoaAddress,
         },
         types: {
+          EIP712Domain: [
+            { name: "name", type: "string" },
+            { name: "version", type: "string" },
+            { name: "chainId", type: "uint256" },
+            { name: "verifyingContract", type: "address" },
+          ],
           CoinbaseSmartWalletMessage: [{ name: "hash", type: "bytes32" }],
         },
         primaryType: "CoinbaseSmartWalletMessage",
         message: { hash },
       };
+      const typedDigest = hashTypedData(typedData as any);
+
+      const validateSignature = async (sig: `0x${string}`) => {
+        try {
+          const magic = await publicClient.readContract({
+            address: eoaAddress,
+            abi: [
+              {
+                type: "function",
+                name: "isValidSignature",
+                stateMutability: "view",
+                inputs: [
+                  { name: "hash", type: "bytes32" },
+                  { name: "signature", type: "bytes" },
+                ],
+                outputs: [{ name: "magicValue", type: "bytes4" }],
+              },
+            ],
+            functionName: "isValidSignature",
+            args: [typedDigest, sig],
+          });
+          return String(magic).toLowerCase() === "0x1626ba7e";
+        } catch {
+          return false;
+        }
+      };
 
       try {
-        return await (effectiveWalletClient as any).signTypedData(typedData);
+        const rawSig = (await (effectiveWalletClient as any).signTypedData(
+          typedData,
+        )) as `0x${string}`;
+        const candidates: `0x${string}`[] = [rawSig];
+        const sigByteLength = (rawSig.length - 2) / 2;
+        if (sigByteLength <= 65) {
+          candidates.push(wrapBaseAccountSignature(rawSig, 0n));
+          candidates.push(wrapBaseAccountSignature(rawSig, 1n));
+        }
+        for (const candidate of candidates) {
+          if (await validateSignature(candidate)) {
+            return candidate;
+          }
+        }
+        return wrapBaseAccountSignature(rawSig, 0n);
       } catch (err) {
         console.warn("Base Account typed data sign failed, falling back", err);
-        return await effectiveWalletClient.signMessage({
+        const rawSig = (await effectiveWalletClient.signMessage({
           message,
-        } as any);
+        } as any)) as `0x${string}`;
+        if (await validateSignature(rawSig)) {
+          return rawSig;
+        }
+        if (await validateSignature(wrapBaseAccountSignature(rawSig, 0n))) {
+          return wrapBaseAccountSignature(rawSig, 0n);
+        }
+        if (await validateSignature(wrapBaseAccountSignature(rawSig, 1n))) {
+          return wrapBaseAccountSignature(rawSig, 1n);
+        }
+        return wrapBaseAccountSignature(rawSig, 0n);
       }
     };
 
@@ -307,15 +376,6 @@ export function useSmartAccount() {
       cancelled = true;
     };
   }, [effectiveWalletClient, eoaAddress, smartAccountAddress, client, getSmartAccountOwner]);
-
-  const publicClient = useMemo(
-    () =>
-      createPublicClient({
-        chain: BASE_SEPOLIA,
-        transport: http(BASE_SEPOLIA.rpcUrls.default.http[0]),
-      }),
-    [],
-  );
 
   const bundlerClient = useMemo(
     () =>
