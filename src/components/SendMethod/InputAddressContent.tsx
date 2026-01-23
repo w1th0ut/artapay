@@ -27,7 +27,7 @@ const publicClient = createPublicClient({
 const ensPublicClient = createPublicClient({
   chain: mainnet,
   transport: env.mainnetRpcUrl ? http(env.mainnetRpcUrl) : http(),
-  ccipRead: true,
+  ccipRead: {},
 });
 
 const isEnsName = (value: string) => {
