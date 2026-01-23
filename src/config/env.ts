@@ -47,7 +47,10 @@ export const env = {
     ),
     "NEXT_PUBLIC_NATIVE_CURRENCY_DECIMALS",
   ),
-  gelatoApiKey: process.env.GELATO_API_KEY,
+  pimlicoApiKey: requireEnv(
+    process.env.NEXT_PUBLIC_PIMLICO_API_KEY,
+    "NEXT_PUBLIC_PIMLICO_API_KEY",
+  ),
   entryPointAddress: requireEnv(
     process.env.NEXT_PUBLIC_ENTRY_POINT_ADDRESS,
     "NEXT_PUBLIC_ENTRY_POINT_ADDRESS",

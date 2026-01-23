@@ -4,9 +4,7 @@ import { env } from "./env";
 export const ENTRY_POINT_ADDRESS = env.entryPointAddress as Address;
 export const SIMPLE_ACCOUNT_FACTORY = env.simpleAccountFactory as Address;
 export const CHAIN_ID = env.chainId;
-export const GELATO_BUNDLER_URL = `https://api.gelato.digital/bundlers/${CHAIN_ID}/rpc${
-  env.gelatoApiKey ? `?apiKey=${env.gelatoApiKey}` : ""
-}`;
+export const PIMLICO_BUNDLER_URL = `https://api.pimlico.io/v2/${CHAIN_ID}/rpc?apikey=${env.pimlicoApiKey}`;
 
 export const PAYMASTER_ADDRESS = env.paymasterAddress as Address;
 export const STABLE_SWAP_ADDRESS = env.stableSwapAddress as Address;

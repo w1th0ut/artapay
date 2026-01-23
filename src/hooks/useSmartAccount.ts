@@ -25,7 +25,7 @@ import { toSimpleSmartAccount } from "permissionless/accounts";
 import { BASE_SEPOLIA } from "@/config/chains";
 import {
   ENTRY_POINT_ADDRESS,
-  GELATO_BUNDLER_URL,
+  PIMLICO_BUNDLER_URL,
   PAYMASTER_ADDRESS,
   PAYMENT_PROCESSOR_ADDRESS,
   SIMPLE_ACCOUNT_FACTORY,
@@ -40,7 +40,7 @@ import { buildPaymasterData } from "@/lib/paymasterData";
 import { getPaymasterSignature } from "@/api/signerApi";
 
 /**
- * Transform Gelato rate limit errors into user-friendly messages
+ * Transform pimlico rate limit errors into user-friendly messages
  */
 function transformError(err: unknown): string {
   const message = err instanceof Error ? err.message : String(err);
@@ -48,7 +48,7 @@ function transformError(err: unknown): string {
     message.toLowerCase().includes("too many requests") ||
     message.toLowerCase().includes("rate limit")
   ) {
-    return "Rate limit gelato reached. Please try again a minute later.";
+    return "Rate limit pimlico reached. Please try again a minute later.";
   }
   return message;
 }
@@ -572,7 +572,7 @@ export function useSmartAccount() {
         const smartAccountClient = createSmartAccountClient({
           account: simpleAccount,
           chain: BASE_SEPOLIA,
-          bundlerTransport: http(GELATO_BUNDLER_URL),
+          bundlerTransport: http(PIMLICO_BUNDLER_URL),
         });
 
         setSmartAccountAddress(simpleAccount.address);
@@ -597,7 +597,7 @@ export function useSmartAccount() {
     () =>
       createPublicClient({
         chain: BASE_SEPOLIA,
-        transport: http(GELATO_BUNDLER_URL),
+        transport: http(PIMLICO_BUNDLER_URL),
       }),
     [],
   );
@@ -605,7 +605,7 @@ export function useSmartAccount() {
   const getFeeParams = useCallback(async () => {
     // Increased buffer to 150% to handle network congestion and bundler requirements
     const addBuffer = (value: bigint) => {
-      const bumped = (value * 30n) / 10n; // +200% (3.0x multiplier)
+      const bumped = (value * 25n) / 10n; // +150% (2.5x multiplier)
       return bumped > value ? bumped : value + 1n;
     };
 
@@ -702,7 +702,7 @@ export function useSmartAccount() {
     const smartAccountClient = createSmartAccountClient({
       account: simpleAccount,
       chain: BASE_SEPOLIA,
-      bundlerTransport: http(GELATO_BUNDLER_URL),
+      bundlerTransport: http(PIMLICO_BUNDLER_URL),
     });
 
     setSmartAccountAddress(simpleAccount.address);
@@ -901,7 +901,7 @@ export function useSmartAccount() {
           signature: signature as `0x${string}`,
         });
 
-        setStatus("Sending UserOperation to Gelato bundler...");
+        setStatus("Sending UserOperation to Pimlico bundler...");
         let userOpHash = "";
         try {
           const res = await client.sendCalls({
@@ -929,7 +929,7 @@ export function useSmartAccount() {
           const msg = err instanceof Error ? err.message : "send failed";
           if (msg.includes("Failed to fetch")) {
             throw new Error(
-              `Bundler RPC unreachable at ${GELATO_BUNDLER_URL} (${msg})`,
+              `Bundler RPC unreachable at ${PIMLICO_BUNDLER_URL} (${msg})`,
             );
           }
           throw err;
@@ -1035,7 +1035,7 @@ export function useSmartAccount() {
           const msg = err instanceof Error ? err.message : "send failed";
           if (msg.includes("Failed to fetch")) {
             throw new Error(
-              `Bundler RPC unreachable at ${GELATO_BUNDLER_URL} (${msg})`,
+              `Bundler RPC unreachable at ${PIMLICO_BUNDLER_URL} (${msg})`,
             );
           }
           throw err;
