@@ -38,10 +38,10 @@ export default function Start() {
     approvePaymaster,
     status,
     baseAppDeployment,
+    deployBaseAccount,
   } = useSmartAccount();
-  const { isApproved, isChecking, refresh } = useApprovalStatus(
-    smartAccountAddress
-  );
+  const { isApproved, isChecking, refresh } =
+    useApprovalStatus(smartAccountAddress);
 
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -66,12 +66,12 @@ export default function Start() {
 
   const ActiveContent = useMemo(
     () => contentComponents[activeMenu],
-    [activeMenu]
+    [activeMenu],
   );
 
   const handleActivate = async () => {
     const tokenAddresses = TOKENS.map(
-      (token) => token.address as `0x${string}`
+      (token) => token.address as `0x${string}`,
     );
     await approvePaymaster(tokenAddresses);
     await refresh(false);
@@ -119,6 +119,7 @@ export default function Start() {
           onActivate={handleActivate}
           status={status}
           baseAppDeployment={baseAppDeployment}
+          onDeployBase={deployBaseAccount}
         />
       )}
     </div>

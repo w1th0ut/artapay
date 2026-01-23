@@ -12,14 +12,17 @@ interface ActivationModalProps {
   onActivate: () => Promise<void>;
   status: string;
   baseAppDeployment: BaseAppDeploymentStatus | null;
+  onDeployBase?: () => Promise<any>;
 }
 
 export default function ActivationModal({
   onActivate,
   status,
   baseAppDeployment,
+  onDeployBase,
 }: ActivationModalProps) {
   const [isActivating, setIsActivating] = useState(false);
+  const [isDeploying, setIsDeploying] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { logout } = usePrivy();
   const isBaseAppNotReady = baseAppDeployment?.status === "missing";
@@ -48,6 +51,26 @@ export default function ActivationModal({
       });
     } finally {
       setIsActivating(false);
+    }
+  };
+
+  const handleDeploy = async () => {
+    if (!onDeployBase) return;
+    setIsDeploying(true);
+    setError(null);
+    try {
+      await onDeployBase();
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Deployment failed";
+      setError(message);
+      setErrorModal({
+        isOpen: true,
+        title: "Deployment Failed",
+        message: message,
+        onRetry: handleDeploy,
+      });
+    } finally {
+      setIsDeploying(false);
     }
   };
 
@@ -105,16 +128,32 @@ export default function ActivationModal({
         </div>
 
         {isBaseAppNotReady && (
-          <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-amber-200 text-xs">
-            <div className="text-sm font-semibold">Base App wallet not ready</div>
-            <div className="mt-2 text-amber-100">
-              Your Base App wallet needs to be activated on {BASE_SEPOLIA.name}.
-              Open Base App, send one transaction on {BASE_SEPOLIA.name}, then
-              retry activation here.
+          <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-amber-200 text-xs space-y-3">
+            <div>
+              <div className="text-sm font-semibold">
+                Base App wallet not ready
+              </div>
+              <div className="mt-2 text-amber-100">
+                Your Base App wallet needs to be deployed on {BASE_SEPOLIA.name}{" "}
+                first. Click the button below to automatically deploy it.
+              </div>
             </div>
+            <button
+              onClick={handleDeploy}
+              disabled={isDeploying}
+              className="w-full py-2.5 bg-amber-500 text-black font-semibold text-sm rounded-lg hover:bg-amber-400 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isDeploying ? (
+                <span className="flex items-center justify-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  DEPLOYING WALLET...
+                </span>
+              ) : (
+                "DEPLOY BASE WALLET"
+              )}
+            </button>
           </div>
         )}
-
 
         {/* Status Message */}
         {isActivating && status && (
