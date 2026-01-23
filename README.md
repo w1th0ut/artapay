@@ -82,7 +82,7 @@ Create a `.env` file in the root directory:
 NEXT_PUBLIC_CHAIN_ID=84532
 NEXT_PUBLIC_CHAIN_NAME=Base Sepolia
 NEXT_PUBLIC_RPC_URL=https://sepolia.base.org
-NEXT_PUBLIC_MAINNET_RPC_URL=https://0xrpc.io/eth
+NEXT_PUBLIC_MAINNET_RPC_URL=https://ethereum-rpc.publicnode.com
 NEXT_PUBLIC_BLOCK_EXPLORER_NAME=Blockscout
 NEXT_PUBLIC_BLOCK_EXPLORER_URL=https://base-sepolia.blockscout.com
 NEXT_PUBLIC_NATIVE_CURRENCY_NAME=Ether

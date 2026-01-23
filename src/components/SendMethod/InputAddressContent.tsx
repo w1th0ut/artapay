@@ -27,6 +27,7 @@ const publicClient = createPublicClient({
 const ensPublicClient = createPublicClient({
   chain: mainnet,
   transport: env.mainnetRpcUrl ? http(env.mainnetRpcUrl) : http(),
+  ccipRead: true,
 });
 
 const isEnsName = (value: string) => {
@@ -44,6 +45,7 @@ const resolveRecipientAddress = async (value: string): Promise<Address> => {
   }
   const resolved = await ensPublicClient.getEnsAddress({
     name: trimmed.toLowerCase(),
+    gatewayUrls: ["https://ccip-v3.ens.xyz"],
   });
   if (!resolved) {
     throw new Error(`ENS name not found: ${trimmed}`);
