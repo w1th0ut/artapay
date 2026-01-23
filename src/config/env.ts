@@ -48,8 +48,8 @@ export const env = {
     "NEXT_PUBLIC_NATIVE_CURRENCY_DECIMALS",
   ),
   pimlicoApiKey: requireEnv(
-    process.env.NEXT_PUBLIC_PIMLICO_API_KEY,
-    "NEXT_PUBLIC_PIMLICO_API_KEY",
+    process.env.PIMLICO_API_KEY,
+    "PIMLICO_API_KEY",
   ),
   entryPointAddress: requireEnv(
     process.env.NEXT_PUBLIC_ENTRY_POINT_ADDRESS,
