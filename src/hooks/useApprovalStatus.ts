@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { createPublicClient, http, type Address } from "viem";
 import { BASE_SEPOLIA } from "@/config/chains";
-import { ERC20_ABI } from "@/config/abi";
+import { ERC20_ABI, PAYMASTER_ABI } from "@/config/abi";
 import { TOKENS, PAYMASTER_ADDRESS } from "@/config/constants";
 
 const publicClient = createPublicClient({
@@ -25,17 +25,23 @@ export function useApprovalStatus(smartAccountAddress: Address | null) {
         setIsChecking(true);
       }
       try {
-        // Check if all tokens are approved to Paymaster
+        // Check if all tokens are supported + approved to Paymaster
         const approvalChecks = await Promise.all(
           TOKENS.map(async (token) => {
             try {
+              const supported = await publicClient.readContract({
+                address: PAYMASTER_ADDRESS,
+                abi: PAYMASTER_ABI,
+                functionName: "isSupportedToken",
+                args: [token.address as Address],
+              });
               const allowance = await publicClient.readContract({
                 address: token.address as Address,
                 abi: ERC20_ABI,
                 functionName: "allowance",
                 args: [smartAccountAddress, PAYMASTER_ADDRESS],
               });
-              return (allowance as bigint) > BigInt(0);
+              return Boolean(supported) && (allowance as bigint) > BigInt(0);
             } catch {
               return false;
             }

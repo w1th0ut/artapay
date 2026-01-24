@@ -16,6 +16,7 @@ import {
   encodeFunctionData,
   maxUint256,
   parseUnits,
+  formatUnits,
   stringToHex,
   toHex,
 } from "viem";
@@ -35,6 +36,7 @@ import {
   FAUCET_ABI,
   PAYMENT_PROCESSOR_ABI,
   STABLE_SWAP_ABI,
+  PAYMASTER_ABI,
 } from "@/config/abi";
 import { buildPaymasterData } from "@/lib/paymasterData";
 import { getPaymasterSignature } from "@/api/signerApi";
@@ -63,6 +65,9 @@ export type BaseAppDeploymentStatus = {
 };
 
 export function useSmartAccount() {
+  const PAYMASTER_VERIFICATION_GAS = BigInt(1_000_000);
+  const PAYMASTER_POST_OP_GAS = BigInt(1_000_000);
+  const PRE_VERIFICATION_GAS = BigInt(150_000);
   const { wallets, ready: privyReady } = useWallets();
   const { authenticated } = usePrivy();
   const { createWallet } = useCreateWallet();
@@ -648,6 +653,93 @@ export function useSmartAccount() {
     }
   }, [publicClient]);
 
+  const estimatePaymasterCost = useCallback(
+    async (
+      token: Address,
+      gasLimit: bigint,
+      maxFeePerGas: bigint,
+    ): Promise<bigint> => {
+      try {
+        const cost = await publicClient.readContract({
+          address: PAYMASTER_ADDRESS,
+          abi: PAYMASTER_ABI,
+          functionName: "estimateTotalCost",
+          args: [token, gasLimit, maxFeePerGas],
+        });
+        return cost as bigint;
+      } catch (err) {
+        console.warn("estimateTotalCost failed", err);
+        return 0n;
+      }
+    },
+    [publicClient],
+  );
+
+  const assertPaymasterBalance = useCallback(
+    async (params: {
+      token: Address;
+      owner: Address;
+      spendAmount: bigint;
+      decimals: number;
+      gasLimit: bigint;
+      maxFeePerGas: bigint;
+    }) => {
+      const [supported, balance, allowance, gasCost] = await Promise.all([
+        publicClient.readContract({
+          address: PAYMASTER_ADDRESS,
+          abi: PAYMASTER_ABI,
+          functionName: "isSupportedToken",
+          args: [params.token],
+        }) as Promise<boolean>,
+        publicClient.readContract({
+          address: params.token,
+          abi: ERC20_ABI,
+          functionName: "balanceOf",
+          args: [params.owner],
+        }) as Promise<bigint>,
+        publicClient.readContract({
+          address: params.token,
+          abi: ERC20_ABI,
+          functionName: "allowance",
+          args: [params.owner, PAYMASTER_ADDRESS],
+        }) as Promise<bigint>,
+        estimatePaymasterCost(
+          params.token,
+          params.gasLimit,
+          params.maxFeePerGas,
+        ),
+      ]);
+
+      if (!supported) {
+        throw new Error(
+          "Token belum didukung oleh paymaster. Coba token lain atau update daftar token paymaster.",
+        );
+      }
+
+      if (allowance === 0n) {
+        throw new Error(
+          "Allowance ke paymaster belum ada. Jalankan Activate Account dulu.",
+        );
+      }
+
+      if (gasCost > 0n && allowance < gasCost) {
+        throw new Error(
+          "Allowance ke paymaster kurang. Jalankan Activate Account lagi.",
+        );
+      }
+
+      const required = params.spendAmount + gasCost;
+      if (balance < required) {
+        const missing = required - balance;
+        const missingFormatted = formatUnits(missing, params.decimals);
+        throw new Error(
+          `Insufficient balance to cover amount + gas fee. Leave about ${missingFormatted} more tokens for gas.`,
+        );
+      }
+    },
+    [estimatePaymasterCost, publicClient],
+  );
+
   const waitForUserOp = useCallback(
     async (userOpHash: `0x${string}`) => {
       // Increased to 40 iterations (40 x 3s = 120s) for complex multi-token transactions
@@ -819,7 +911,7 @@ export function useSmartAccount() {
         setIsLoading(false);
       }
     },
-    [ensureClient, getFeeParams, waitForUserOp],
+    [ensureClient, getFeeParams, waitForUserOp, assertPaymasterBalance],
   );
 
   const claimFaucet = useCallback(
@@ -893,7 +985,7 @@ export function useSmartAccount() {
         setIsLoading(false);
       }
     },
-    [ensureClient, getFeeParams, waitForUserOp],
+    [ensureClient, getFeeParams, waitForUserOp, assertPaymasterBalance],
   );
 
   const sendGaslessTransfer = useCallback(
@@ -909,6 +1001,16 @@ export function useSmartAccount() {
         const { client, address } = await ensureClient();
         const amountParsed = parseUnits(params.amount, params.decimals);
         const feeParams = await getFeeParams();
+        const gasLimitEstimate =
+          220_000n + 450_000n + PAYMASTER_VERIFICATION_GAS + PAYMASTER_POST_OP_GAS + PRE_VERIFICATION_GAS;
+        await assertPaymasterBalance({
+          token: params.tokenAddress,
+          owner: address,
+          spendAmount: amountParsed,
+          decimals: params.decimals,
+          gasLimit: gasLimitEstimate,
+          maxFeePerGas: feeParams.maxFeePerGas,
+        });
 
         setStatus("Requesting paymaster signature...");
         const validUntil = Math.floor(Date.now() / 1000) + 3600;
@@ -948,10 +1050,11 @@ export function useSmartAccount() {
             ],
             paymaster: PAYMASTER_ADDRESS,
             paymasterData,
-            paymasterVerificationGasLimit: BigInt(200_000),
-            paymasterPostOpGasLimit: BigInt(200_000),
+            paymasterVerificationGasLimit: PAYMASTER_VERIFICATION_GAS,
+            paymasterPostOpGasLimit: PAYMASTER_POST_OP_GAS,
             callGasLimit: BigInt(220_000),
             verificationGasLimit: BigInt(450_000),
+            preVerificationGas: PRE_VERIFICATION_GAS,
             ...feeParams,
           });
           userOpHash = res.id as `0x${string}`;
@@ -982,7 +1085,7 @@ export function useSmartAccount() {
         setIsLoading(false);
       }
     },
-    [ensureClient, getFeeParams, waitForUserOp],
+    [ensureClient, getFeeParams, waitForUserOp, assertPaymasterBalance],
   );
 
   const sendBatchTransfer = useCallback(
@@ -1039,6 +1142,10 @@ export function useSmartAccount() {
           value: BigInt(0),
         }));
 
+        const totalSpend = params.recipients.reduce((sum, recipient) => {
+          return sum + parseUnits(recipient.amount, params.decimals);
+        }, 0n);
+
         // Dynamic gas limits based on recipient count
         const recipientCount = params.recipients.length;
         const baseCallGas = 100_000;
@@ -1046,6 +1153,16 @@ export function useSmartAccount() {
         const callGasLimit = BigInt(
           baseCallGas + recipientCount * perTransferGas,
         );
+        const gasLimitEstimate =
+          callGasLimit + 450_000n + PAYMASTER_VERIFICATION_GAS + PAYMASTER_POST_OP_GAS + PRE_VERIFICATION_GAS;
+        await assertPaymasterBalance({
+          token: params.tokenAddress,
+          owner: address,
+          spendAmount: totalSpend,
+          decimals: params.decimals,
+          gasLimit: gasLimitEstimate,
+          maxFeePerGas: feeParams.maxFeePerGas,
+        });
 
         setStatus(`Sending batch transfer to ${recipientCount} recipients...`);
         let userOpHash = "";
@@ -1054,10 +1171,11 @@ export function useSmartAccount() {
             calls,
             paymaster: PAYMASTER_ADDRESS,
             paymasterData,
-            paymasterVerificationGasLimit: BigInt(200_000),
-            paymasterPostOpGasLimit: BigInt(200_000),
+            paymasterVerificationGasLimit: PAYMASTER_VERIFICATION_GAS,
+            paymasterPostOpGasLimit: PAYMASTER_POST_OP_GAS,
             callGasLimit,
             verificationGasLimit: BigInt(450_000),
+            preVerificationGas: PRE_VERIFICATION_GAS,
             ...feeParams,
           });
           userOpHash = res.id as `0x${string}`;
@@ -1115,6 +1233,16 @@ export function useSmartAccount() {
           params.currentAllowance < params.totalUserPays;
 
         const feeParams = await getFeeParams();
+        const gasLimitEstimate =
+          1_200_000n + 1_200_000n + PAYMASTER_VERIFICATION_GAS + PAYMASTER_POST_OP_GAS + PRE_VERIFICATION_GAS;
+        await assertPaymasterBalance({
+          token: params.tokenIn,
+          owner: address,
+          spendAmount: params.totalUserPays,
+          decimals: params.tokenInDecimals,
+          gasLimit: gasLimitEstimate,
+          maxFeePerGas: feeParams.maxFeePerGas,
+        });
         const validUntil = Math.floor(Date.now() / 1000) + 3600;
         const validAfter = 0;
         setStatus("Requesting paymaster signature for swap...");
@@ -1168,10 +1296,11 @@ export function useSmartAccount() {
           calls,
           paymaster: PAYMASTER_ADDRESS,
           paymasterData,
-          paymasterVerificationGasLimit: BigInt(220_000),
-          paymasterPostOpGasLimit: BigInt(220_000),
-          callGasLimit: BigInt(600_000),
-          verificationGasLimit: BigInt(700_000),
+          paymasterVerificationGasLimit: PAYMASTER_VERIFICATION_GAS,
+          paymasterPostOpGasLimit: PAYMASTER_POST_OP_GAS,
+          callGasLimit: BigInt(1_200_000),
+          verificationGasLimit: BigInt(1_200_000),
+          preVerificationGas: PRE_VERIFICATION_GAS,
           ...feeParams,
         });
 

@@ -487,9 +487,13 @@ export default function TransactionPopup({
         const requestedRate = TOKEN_RATES[requestedCurrency.symbol] || 1;
         const shortfallInThisToken =
           (shortfallInRequested / requestedRate) * rate;
+        const currentAmount = parseFloat(p.amount) || 0;
+        const nextAmount = currentAmount + shortfallInThisToken;
         return {
           symbol: p.currency.symbol,
           amount: shortfallInThisToken,
+          currentAmount,
+          nextAmount,
         };
       });
   }, [
@@ -839,6 +843,13 @@ export default function TransactionPopup({
                               })}
                             </span>
                             <span className="ml-1">{opt.symbol}</span>
+                            <span className="ml-1 text-orange-400/80">
+                              (
+                              {opt.nextAmount.toLocaleString(undefined, {
+                                maximumFractionDigits: 4,
+                              })}{" "}
+                              {opt.symbol})
+                            </span>
                           </div>
                         ))}
                       </div>
