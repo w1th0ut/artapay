@@ -1,8 +1,8 @@
 // @ts-nocheck
 "use client";
 
-import { useCallback, useMemo, useState, useEffect } from "react";
-import { useWallets, usePrivy } from "@privy-io/react-auth";
+import { useCallback, useMemo, useState, useEffect, useRef } from "react";
+import { useWallets, usePrivy, useCreateWallet } from "@privy-io/react-auth";
 import {
   createPublicClient,
   createWalletClient,
@@ -64,7 +64,9 @@ export type BaseAppDeploymentStatus = {
 
 export function useSmartAccount() {
   const { wallets, ready: privyReady } = useWallets();
-  const { authenticated, user } = usePrivy();
+  const { authenticated } = usePrivy();
+  const { createWallet } = useCreateWallet();
+  const hasAttemptedCreate = useRef(false);
   const [smartAccountAddress, setSmartAccountAddress] =
     useState<Address | null>(null);
   const [eoaAddress, setEoaAddress] = useState<Address | null>(null);
@@ -97,7 +99,26 @@ export function useSmartAccount() {
   // isReady = true when: not authenticated OR smartAccountAddress is set
   const isReady = !authenticated || !!smartAccountAddress;
 
-  // Pick Privy wallet: prefer Base Account/external wallets, fallback to embedded
+  // Ensure an embedded Privy wallet exists for signing
+  useEffect(() => {
+    if (!authenticated || !privyReady) {
+      hasAttemptedCreate.current = false;
+      return;
+    }
+
+    const hasEmbedded = wallets.some(
+      (w) => w.type === "ethereum" && w.walletClientType === "privy",
+    );
+
+    if (!hasEmbedded && !hasAttemptedCreate.current) {
+      hasAttemptedCreate.current = true;
+      createWallet().catch((err) => {
+        console.warn("Failed to create embedded wallet", err);
+      });
+    }
+  }, [authenticated, privyReady, wallets, createWallet]);
+
+  // Pick Privy wallet: always embedded (Privy)
   useEffect(() => {
     let cancelled = false;
 
@@ -115,33 +136,19 @@ export function useSmartAccount() {
         String(w.walletClientType || w.connectorType || "").toLowerCase();
       const isBaseAccount = (w: any) =>
         ["base_account", "base"].includes(getWalletKey(w));
-      const baseAccount = ethereumWallets.find(isBaseAccount);
-      const external = ethereumWallets.find((w) => {
-        const key = getWalletKey(w);
-        return key && key !== "privy" && !isBaseAccount(w);
-      });
       const embedded = ethereumWallets.find(
         (w) => w.walletClientType === "privy",
       );
 
-      // Prioritize the wallet associated with the authenticated user
-      let chosen = ethereumWallets.find(
-        (w) => w.address.toLowerCase() === user?.wallet?.address.toLowerCase(),
-      );
-
-      // Fallback strategies if user.wallet is not in ethereumWallets (unexpected)
-      if (!chosen) {
-        chosen = baseAccount || embedded || external || ethereumWallets[0];
-      }
+      // Always use embedded wallet for signing
+      const chosen = embedded;
 
       if (!chosen) {
         if (cancelled) return;
         setEffectiveWalletClient(null);
         setEoaAddress(null);
         setWalletSource(null);
-        setStatus(
-          "No wallet found. Connect a wallet or enable embedded wallet (createOnLogin) in Privy and re-login.",
-        );
+        setStatus("Embedded wallet not ready. Creating wallet...");
         return;
       }
 
