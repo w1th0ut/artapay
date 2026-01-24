@@ -64,7 +64,7 @@ export type BaseAppDeploymentStatus = {
 
 export function useSmartAccount() {
   const { wallets, ready: privyReady } = useWallets();
-  const { authenticated } = usePrivy();
+  const { authenticated, user } = usePrivy();
   const [smartAccountAddress, setSmartAccountAddress] =
     useState<Address | null>(null);
   const [eoaAddress, setEoaAddress] = useState<Address | null>(null);
@@ -115,9 +115,6 @@ export function useSmartAccount() {
         String(w.walletClientType || w.connectorType || "").toLowerCase();
       const isBaseAccount = (w: any) =>
         ["base_account", "base"].includes(getWalletKey(w));
-      const isCoinbaseWallet = (w: any) =>
-        ["coinbase_wallet", "coinbase"].includes(getWalletKey(w));
-
       const baseAccount = ethereumWallets.find(isBaseAccount);
       const external = ethereumWallets.find((w) => {
         const key = getWalletKey(w);
@@ -126,7 +123,16 @@ export function useSmartAccount() {
       const embedded = ethereumWallets.find(
         (w) => w.walletClientType === "privy",
       );
-      const chosen = baseAccount || embedded || external || ethereumWallets[0];
+
+      // Prioritize the wallet associated with the authenticated user
+      let chosen = ethereumWallets.find(
+        (w) => w.address.toLowerCase() === user?.wallet?.address.toLowerCase(),
+      );
+
+      // Fallback strategies if user.wallet is not in ethereumWallets (unexpected)
+      if (!chosen) {
+        chosen = baseAccount || embedded || external || ethereumWallets[0];
+      }
 
       if (!chosen) {
         if (cancelled) return;
