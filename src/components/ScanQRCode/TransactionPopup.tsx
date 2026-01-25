@@ -754,8 +754,8 @@ export default function TransactionPopup({
                   key={entry.id}
                   className="bg-zinc-700/30 p-3 rounded-lg space-y-2"
                 >
-                  <div className="flex gap-2 items-center">
-                    <div className="flex-1">
+                  <div className="flex flex-wrap gap-2 items-center">
+                    <div className="flex-1 min-w-0 basis-full sm:basis-auto">
                       <CurrencyDropdown
                         value={entry.currency}
                         onChange={(c) =>
