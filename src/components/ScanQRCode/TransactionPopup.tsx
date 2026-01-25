@@ -8,6 +8,7 @@ import {
   Plus,
   Trash2,
   CheckCircle,
+  Zap,
 } from "lucide-react";
 import { useSmartAccount } from "@/hooks/useSmartAccount";
 import { currencies, Currency } from "@/components/Currency";
@@ -202,15 +203,16 @@ export default function TransactionPopup({
             }
           | [bigint, bigint, bigint, bigint];
 
-        const [baseAmount, platformFee, swapFee, totalRequired] =
-          Array.isArray(breakdown)
-            ? breakdown
-            : [
-                breakdown.baseAmount,
-                breakdown.platformFee,
-                breakdown.swapFee,
-                breakdown.totalRequired,
-              ];
+        const [baseAmount, platformFee, swapFee, totalRequired] = Array.isArray(
+          breakdown,
+        )
+          ? breakdown
+          : [
+              breakdown.baseAmount,
+              breakdown.platformFee,
+              breakdown.swapFee,
+              breakdown.totalRequired,
+            ];
 
         setQuote({
           baseAmount: BigInt(baseAmount || 0),
@@ -381,9 +383,7 @@ export default function TransactionPopup({
 
   const multiEstimatedTotal = useMemo(() => {
     if (!requestedCurrency) return 0;
-    return (
-      multiTotalUsdValue * (TOKEN_RATES[requestedCurrency.symbol] || 1)
-    );
+    return multiTotalUsdValue * (TOKEN_RATES[requestedCurrency.symbol] || 1);
   }, [multiTotalUsdValue, requestedCurrency]);
 
   const multiCurrentTotal = useMemo(
@@ -400,6 +400,51 @@ export default function TransactionPopup({
     multiCurrentTotal > multiRequiredTotal + MULTI_VALUE_EPSILON;
 
   const multiOverage = Math.max(0, multiCurrentTotal - multiRequiredTotal);
+
+  // Fill remaining amount for a specific token entry
+  const fillRemainingAmount = useCallback(
+    (entryId: string) => {
+      if (!requestedCurrency) return;
+
+      // Calculate current total from other entries (excluding the target entry)
+      const otherEntriesTotal = multiPayments
+        .filter((p) => p.id !== entryId)
+        .reduce((sum, p) => {
+          const amt = parseFloat(p.amount) || 0;
+          return sum + toUsdValue(amt, p.currency.symbol);
+        }, 0);
+
+      // Calculate how much USD value is still needed
+      const otherEntriesInRequested =
+        otherEntriesTotal * (TOKEN_RATES[requestedCurrency.symbol] || 1);
+      const remainingNeeded = multiRequiredTotal - otherEntriesInRequested;
+
+      if (remainingNeeded <= 0) return;
+
+      // Find the target entry and calculate amount in that token
+      const targetEntry = multiPayments.find((p) => p.id === entryId);
+      if (!targetEntry) return;
+
+      const targetRate = TOKEN_RATES[targetEntry.currency.symbol] || 1;
+      const requestedRate = TOKEN_RATES[requestedCurrency.symbol] || 1;
+
+      // Convert remaining needed to target token
+      const amountInTargetToken =
+        (remainingNeeded / requestedRate) * targetRate;
+
+      // Check balance limit
+      const balance = parseFloat(targetEntry.balance) || 0;
+      const finalAmount = Math.min(amountInTargetToken, balance);
+
+      // Update the entry with calculated amount
+      setMultiPayments((prev) =>
+        prev.map((p) =>
+          p.id === entryId ? { ...p, amount: finalAmount.toFixed(6) } : p,
+        ),
+      );
+    },
+    [multiPayments, requestedCurrency, multiRequiredTotal],
+  );
 
   // On-chain verification effect (Optimistic UI: verify in background)
   useEffect(() => {
@@ -496,12 +541,7 @@ export default function TransactionPopup({
           nextAmount,
         };
       });
-  }, [
-    multiPayments,
-    multiCurrentTotal,
-    multiRequiredTotal,
-    requestedCurrency,
-  ]);
+  }, [multiPayments, multiCurrentTotal, multiRequiredTotal, requestedCurrency]);
 
   const overageOptions = useMemo(() => {
     if (!requestedCurrency) return [];
@@ -514,8 +554,7 @@ export default function TransactionPopup({
       .map((p) => {
         const rate = TOKEN_RATES[p.currency.symbol] || 1;
         const requestedRate = TOKEN_RATES[requestedCurrency.symbol] || 1;
-        const overageInThisToken =
-          (overageInRequested / requestedRate) * rate;
+        const overageInThisToken = (overageInRequested / requestedRate) * rate;
         const currentAmount = parseFloat(p.amount) || 0;
         const nextAmount = Math.max(0, currentAmount - overageInThisToken);
         return {
@@ -525,12 +564,7 @@ export default function TransactionPopup({
           nextAmount,
         };
       });
-  }, [
-    multiPayments,
-    multiCurrentTotal,
-    multiRequiredTotal,
-    requestedCurrency,
-  ]);
+  }, [multiPayments, multiCurrentTotal, multiRequiredTotal, requestedCurrency]);
 
   const handleSend = async () => {
     if (!smartAccountAddress) return;
@@ -718,7 +752,7 @@ export default function TransactionPopup({
               {multiPayments.map((entry, idx) => (
                 <div
                   key={entry.id}
-                  className="bg-zinc-700/30 p-3 rounded-lg space-y-1"
+                  className="bg-zinc-700/30 p-3 rounded-lg space-y-2"
                 >
                   <div className="flex gap-2 items-center">
                     <div className="flex-1">
@@ -736,8 +770,17 @@ export default function TransactionPopup({
                         updatePaymentEntry(entry.id, "amount", e.target.value)
                       }
                       placeholder="0"
-                      className="w-28 p-2 bg-zinc-800 border border-zinc-600 rounded-lg text-white text-right focus:outline-none focus:border-primary"
+                      className="w-24 p-2 bg-zinc-800 border border-zinc-600 rounded-lg text-white text-right focus:outline-none focus:border-primary"
                     />
+                    <button
+                      type="button"
+                      onClick={() => fillRemainingAmount(entry.id)}
+                      className="px-2 py-2 bg-primary/20 hover:bg-primary/30 text-primary rounded-lg text-xs font-medium transition-colors flex items-center gap-1"
+                      title="Fill remaining amount"
+                    >
+                      <Zap className="w-3 h-3" />
+                      Fill
+                    </button>
                     {multiPayments.length > 1 && (
                       <button
                         onClick={() => removePaymentEntry(entry.id)}
@@ -748,9 +791,7 @@ export default function TransactionPopup({
                     )}
                   </div>
                   {idx === 0 && (
-                    <div className="text-xs text-primary/80">
-                      Gas fee token
-                    </div>
+                    <div className="text-xs text-primary/80">Gas fee token</div>
                   )}
                 </div>
               ))}
@@ -1076,4 +1117,3 @@ export default function TransactionPopup({
     </div>
   );
 }
-

@@ -32,7 +32,9 @@ const ensPublicClient = createPublicClient({
 
 const isEnsName = (value: string) => {
   const trimmed = value.trim();
-  return trimmed.length > 0 && !trimmed.startsWith("0x") && trimmed.includes(".");
+  return (
+    trimmed.length > 0 && !trimmed.startsWith("0x") && trimmed.includes(".")
+  );
 };
 
 const resolveRecipientAddress = async (value: string): Promise<Address> => {
@@ -524,37 +526,56 @@ export default function InputAddressContent({
               {batchRecipients.map((recipient, idx) => (
                 <div
                   key={recipient.id}
-                  className="flex gap-2 items-center p-3 bg-zinc-800/50 rounded-xl border border-zinc-700"
+                  className="p-3 bg-zinc-800/50 rounded-xl border border-zinc-700"
                 >
-                  <span className="text-zinc-500 text-sm w-6">{idx + 1}.</span>
-                  <input
-                    type="text"
-                    value={recipient.address}
-                    onChange={(e) =>
-                      updateRecipient(recipient.id, "address", e.target.value)
-                    }
-                    placeholder="0x... or name.base.eth"
-                    className="flex-1 p-2 bg-zinc-700 border border-zinc-600 rounded-lg text-white text-sm placeholder-zinc-500 focus:outline-none focus:border-primary"
-                  />
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={recipient.amount}
-                    onChange={(e) =>
-                      updateRecipient(recipient.id, "amount", e.target.value)
-                    }
-                    placeholder="Amount"
-                    className="w-28 p-2 bg-zinc-700 border border-zinc-600 rounded-lg text-white text-sm text-right placeholder-zinc-500 focus:outline-none focus:border-primary"
-                  />
-                  {batchRecipients.length > 1 && (
-                    <button
-                      type="button"
-                      onClick={() => removeRecipient(recipient.id)}
-                      className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/20 rounded-lg transition-colors"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  )}
+                  {/* Mobile: Vertical layout / Desktop: Horizontal layout */}
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    {/* Row number + Address */}
+                    <div className="flex gap-2 items-center flex-1">
+                      <span className="text-zinc-500 text-sm w-6 shrink-0">
+                        {idx + 1}.
+                      </span>
+                      <input
+                        type="text"
+                        value={recipient.address}
+                        onChange={(e) =>
+                          updateRecipient(
+                            recipient.id,
+                            "address",
+                            e.target.value,
+                          )
+                        }
+                        placeholder="0x... or name.base.eth"
+                        className="flex-1 p-2 bg-zinc-700 border border-zinc-600 rounded-lg text-white text-sm placeholder-zinc-500 focus:outline-none focus:border-primary min-w-0"
+                      />
+                    </div>
+                    {/* Amount + Delete button */}
+                    <div className="flex gap-2 items-center sm:ml-0 ml-8">
+                      <input
+                        type="text"
+                        inputMode="decimal"
+                        value={recipient.amount}
+                        onChange={(e) =>
+                          updateRecipient(
+                            recipient.id,
+                            "amount",
+                            e.target.value,
+                          )
+                        }
+                        placeholder="Amount"
+                        className="w-full sm:w-28 p-2 bg-zinc-700 border border-zinc-600 rounded-lg text-white text-sm text-right placeholder-zinc-500 focus:outline-none focus:border-primary"
+                      />
+                      {batchRecipients.length > 1 && (
+                        <button
+                          type="button"
+                          onClick={() => removeRecipient(recipient.id)}
+                          className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/20 rounded-lg transition-colors shrink-0"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
                 </div>
               ))}
 

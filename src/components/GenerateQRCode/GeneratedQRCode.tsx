@@ -2,7 +2,7 @@
 
 import { useRef, useEffect, useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
-import { Download } from "lucide-react";
+import { Download, Share2, Copy, Check } from "lucide-react";
 import { currencies } from "@/components/Currency";
 import { formatUnits } from "viem";
 
@@ -33,17 +33,42 @@ export default function GeneratedQRCode({
   const qrRef = useRef<HTMLDivElement>(null);
   const qrValue = JSON.stringify(data);
   const [remainingSeconds, setRemainingSeconds] = useState(0);
+  const [toast, setToast] = useState<{
+    show: boolean;
+    message: string;
+    type: "success" | "error";
+  }>({ show: false, message: "", type: "success" });
+
+  // Detect mobile device
+  const isMobile =
+    typeof navigator !== "undefined" &&
+    /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+      navigator.userAgent,
+    );
+
+  // Show toast helper
+  const showToast = (
+    message: string,
+    type: "success" | "error" = "success",
+  ) => {
+    setToast({ show: true, message, type });
+    setTimeout(
+      () => setToast({ show: false, message: "", type: "success" }),
+      3000,
+    );
+  };
 
   // Find currency info from token address
   const currency = currencies.find(
     (c) =>
-      c.tokenAddress.toLowerCase() === data.request.requestedToken.toLowerCase()
+      c.tokenAddress.toLowerCase() ===
+      data.request.requestedToken.toLowerCase(),
   );
 
   const displayAmount = currency
     ? Number(
-      formatUnits(BigInt(data.request.requestedAmountRaw), currency.decimals)
-    ).toLocaleString(undefined, { maximumFractionDigits: 6 })
+        formatUnits(BigInt(data.request.requestedAmountRaw), currency.decimals),
+      ).toLocaleString(undefined, { maximumFractionDigits: 6 })
     : data.request.requestedAmountRaw;
 
   const symbol = currency?.symbol || "Token";
@@ -123,6 +148,92 @@ export default function GeneratedQRCode({
     img.src = url;
   };
 
+  const handleShare = async () => {
+    if (!qrRef.current) return;
+
+    const svg = qrRef.current.querySelector("svg");
+    if (!svg) return;
+
+    try {
+      // Create canvas
+      const canvas = document.createElement("canvas");
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+
+      // Set canvas size with padding
+      const size = 300;
+      const padding = 30;
+      canvas.width = size + padding * 2;
+      canvas.height = size + padding * 2;
+
+      // Fill white background
+      ctx.fillStyle = "white";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Convert SVG to image
+      const svgData = new XMLSerializer().serializeToString(svg);
+      const svgBlob = new Blob([svgData], {
+        type: "image/svg+xml;charset=utf-8",
+      });
+      const url = URL.createObjectURL(svgBlob);
+
+      const img = new Image();
+      img.onload = async () => {
+        ctx.drawImage(img, padding, padding, size, size);
+        URL.revokeObjectURL(url);
+
+        // Convert canvas to blob
+        canvas.toBlob(async (blob) => {
+          if (!blob) return;
+
+          const fileName = `artapay-qr-${displayAmount}-${symbol}.png`;
+
+          // MOBILE: Use native share (better UX)
+          if (isMobile && navigator.canShare) {
+            const file = new File([blob], fileName, { type: "image/png" });
+
+            if (navigator.canShare({ files: [file] })) {
+              try {
+                await navigator.share({
+                  title: "ArtaPay Payment QR",
+                  text: `Scan to pay ${displayAmount} ${symbol}`,
+                  files: [file],
+                });
+                return; // Success, exit early
+              } catch (err) {
+                if ((err as Error).name === "AbortError") {
+                  return; // User cancelled, exit early
+                }
+                console.error("Share failed:", err);
+                // Fall through to download
+              }
+            }
+          }
+
+          // DESKTOP: Copy to clipboard only
+          try {
+            await navigator.clipboard.write([
+              new ClipboardItem({ "image/png": blob }),
+            ]);
+            showToast("QR code copied!", "success");
+          } catch (clipboardErr) {
+            console.error("Clipboard copy failed:", clipboardErr);
+            // Fallback: download if clipboard fails
+            const link = document.createElement("a");
+            link.download = fileName;
+            link.href = canvas.toDataURL("image/png");
+            link.click();
+            showToast("QR code downloaded!", "success");
+          }
+        }, "image/png");
+      };
+      img.src = url;
+    } catch (err) {
+      console.error("Share error:", err);
+      showToast("Failed to share QR code", "error");
+    }
+  };
+
   return (
     <div className="flex flex-col items-center gap-4">
       <div ref={qrRef} className="p-6 bg-white rounded-2xl">
@@ -133,15 +244,29 @@ export default function GeneratedQRCode({
         <p className="text-primary text-2xl font-bold">
           {displayAmount} {symbol}
         </p>
-        <p className="text-zinc-400 text-sm mt-2">
-          Expires in {formattedTime}
-        </p>
+        <p className="text-zinc-400 text-sm mt-2">Expires in {formattedTime}</p>
       </div>
 
       <div className="flex flex-col gap-2 w-full max-w-sm">
         <button
-          onClick={handleDownload}
+          onClick={handleShare}
           className="w-full py-4 bg-primary text-black font-bold text-xl rounded-xl hover:bg-primary/90 transition-colors cursor-pointer flex items-center justify-center gap-2"
+        >
+          {isMobile ? (
+            <>
+              <Share2 className="w-5 h-5" />
+              SHARE QR
+            </>
+          ) : (
+            <>
+              <Copy className="w-5 h-5" />
+              COPY QR
+            </>
+          )}
+        </button>
+        <button
+          onClick={handleDownload}
+          className="w-full py-4 bg-zinc-700 text-white font-bold text-xl rounded-xl hover:bg-zinc-600 transition-colors cursor-pointer flex items-center justify-center gap-2"
         >
           <Download className="w-5 h-5" />
           SAVE QR
@@ -153,6 +278,26 @@ export default function GeneratedQRCode({
           CANCEL
         </button>
       </div>
+
+      {/* Toast Notification */}
+      {toast.show && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-4 fade-in duration-200">
+          <div
+            className={`flex items-center gap-3 px-5 py-3 rounded-xl shadow-2xl border ${
+              toast.type === "success"
+                ? "bg-zinc-900 border-primary/50 text-primary"
+                : "bg-zinc-900 border-red-500/50 text-red-400"
+            }`}
+          >
+            {toast.type === "success" ? (
+              <Check className="w-5 h-5" />
+            ) : (
+              <span className="text-lg">⚠️</span>
+            )}
+            <span className="font-medium text-white">{toast.message}</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
