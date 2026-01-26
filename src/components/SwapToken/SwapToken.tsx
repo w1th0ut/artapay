@@ -214,7 +214,14 @@ export default function SwapToken() {
     : "0";
 
   const rate = swapQuote
-    ? (Number(swapQuote.amountOut) / Number(swapQuote.amountIn)).toFixed(4)
+    ? (
+        (parseFloat(
+          formatUnits(BigInt(swapQuote.amountOut), toCurrency.decimals)
+        ) || 0) /
+        (parseFloat(
+          formatUnits(BigInt(swapQuote.amountIn), fromCurrency.decimals)
+        ) || 1)
+      ).toFixed(4)
     : null;
 
   return (
