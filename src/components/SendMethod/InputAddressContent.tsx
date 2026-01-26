@@ -372,7 +372,7 @@ export default function InputAddressContent({
         if (amountOut > 0) {
           const feeRate =
             parseFloat(formatUnits(swapQuote.fee, payToken.decimals)) /
-              amountOut || 0;
+            amountOut || 0;
           return batchTotal * feeRate;
         }
       }
@@ -447,10 +447,10 @@ export default function InputAddressContent({
         prev.map((r) =>
           r.id === id
             ? {
-                ...r,
-                [field]:
-                  field === "amount" ? value.replace(/[^0-9.]/g, "") : value,
-              }
+              ...r,
+              [field]:
+                field === "amount" ? value.replace(/[^0-9.]/g, "") : value,
+            }
             : r,
         ),
       );
@@ -880,11 +880,10 @@ export default function InputAddressContent({
                 setBatchRecipients([{ id: "1", address: "", amount: "" }]);
               }
             }}
-            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-              isBatchMode
-                ? "bg-primary text-black"
-                : "bg-zinc-700 text-zinc-300 hover:bg-zinc-600"
-            }`}
+            className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${isBatchMode
+              ? "bg-primary text-black"
+              : "bg-zinc-700 text-zinc-300 hover:bg-zinc-600"
+              }`}
           >
             {isBatchMode ? "ON" : "OFF"}
           </button>
@@ -904,56 +903,57 @@ export default function InputAddressContent({
               {batchRecipients.map((recipient, idx) => (
                 <div
                   key={recipient.id}
-                  className="p-3 bg-zinc-800/50 rounded-xl border border-zinc-700"
+                  className="p-3 bg-zinc-800/50 rounded-xl border border-zinc-700 space-y-2"
                 >
-                  {/* Mobile: Vertical layout / Desktop: Horizontal layout */}
-                  <div className="flex flex-col sm:flex-row gap-2">
-                    {/* Row number + Address */}
-                    <div className="flex gap-2 items-center flex-1">
-                      <span className="text-zinc-500 text-sm w-6 shrink-0">
-                        {idx + 1}.
-                      </span>
-                      <input
-                        type="text"
-                        value={recipient.address}
-                        onChange={(e) =>
-                          updateRecipient(
-                            recipient.id,
-                            "address",
-                            e.target.value,
-                          )
-                        }
-                        placeholder="0x... or name.base.eth"
-                        className="flex-1 p-2 bg-zinc-700 border border-zinc-600 rounded-lg text-white text-sm placeholder-zinc-500 focus:outline-none focus:border-primary min-w-0"
-                      />
-                    </div>
-                    {/* Amount + Delete button */}
-                    <div className="flex gap-2 items-center sm:ml-0 ml-8">
-                      <input
-                        type="text"
-                        inputMode="decimal"
-                        value={recipient.amount}
-                        onChange={(e) =>
-                          updateRecipient(
-                            recipient.id,
-                            "amount",
-                            e.target.value,
-                          )
-                        }
-                        placeholder="Amount"
-                        className="w-full sm:w-28 p-2 bg-zinc-700 border border-zinc-600 rounded-lg text-white text-sm text-right placeholder-zinc-500 focus:outline-none focus:border-primary"
-                      />
-                      {batchRecipients.length > 1 && (
-                        <button
-                          type="button"
-                          onClick={() => removeRecipient(recipient.id)}
-                          className="p-2 text-red-400 hover:text-red-300 hover:bg-red-500/20 rounded-lg transition-colors shrink-0"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
+                  {/* Row number + Address */}
+                  <div className="flex gap-2 items-center">
+                    <span className="text-zinc-500 text-sm w-6 shrink-0">
+                      {idx + 1}.
+                    </span>
+                    <input
+                      type="text"
+                      value={recipient.address}
+                      onChange={(e) =>
+                        updateRecipient(
+                          recipient.id,
+                          "address",
+                          e.target.value,
+                        )
+                      }
+                      placeholder="0x... or name.base.eth"
+                      className="flex-1 p-2 bg-zinc-700 border border-zinc-600 rounded-lg text-white text-sm placeholder-zinc-500 focus:outline-none focus:border-primary min-w-0"
+                    />
                   </div>
+                  {/* Amount field */}
+                  <div className="ml-8">
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={recipient.amount}
+                      onChange={(e) =>
+                        updateRecipient(
+                          recipient.id,
+                          "amount",
+                          e.target.value,
+                        )
+                      }
+                      placeholder="Amount"
+                      className="w-full p-2 bg-zinc-700 border border-zinc-600 rounded-lg text-white text-sm text-right placeholder-zinc-500 focus:outline-none focus:border-primary"
+                    />
+                  </div>
+                  {/* Delete button - full width below amount */}
+                  {batchRecipients.length > 1 && (
+                    <div className="ml-8">
+                      <button
+                        type="button"
+                        onClick={() => removeRecipient(recipient.id)}
+                        className="w-full py-1.5 text-red-400 hover:text-red-300 hover:bg-red-500/20 border border-red-500/30 rounded-lg transition-colors text-xs flex items-center justify-center gap-1"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                        Remove
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))}
 
@@ -1060,7 +1060,7 @@ export default function InputAddressContent({
                 value={address}
                 onChange={(e) => setAddress(e.target.value)}
                 placeholder="Enter wallet address or ENS"
-                className="w-full p-4 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-primary transition-colors"
+                className="w-full p-3 sm:p-4 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-primary transition-colors text-sm sm:text-base"
               />
             </div>
 
@@ -1074,8 +1074,8 @@ export default function InputAddressContent({
                     {isLoadingBalance
                       ? "..."
                       : effectiveBalance.toLocaleString(undefined, {
-                          maximumFractionDigits: 4,
-                        })}
+                        maximumFractionDigits: 4,
+                      })}
                   </span>
                 )}
               </div>
@@ -1085,7 +1085,7 @@ export default function InputAddressContent({
                 value={amountInput}
                 onChange={handleAmountChange}
                 placeholder="0"
-                className="w-full p-4 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-primary transition-colors"
+                className="w-full p-3 sm:p-4 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-primary transition-colors text-sm sm:text-base"
               />
               {smartAccountAddress &&
                 Number.isFinite(numAmount) &&
@@ -1139,23 +1139,22 @@ export default function InputAddressContent({
             !smartAccountAddress ||
             (isBatchMode
               ? hasBatchInsufficientBalance ||
-                !hasBatchValidRecipients ||
-                batchValidationErrors.length > 0
+              !hasBatchValidRecipients ||
+              batchValidationErrors.length > 0
               : hasInsufficientBalance)
           }
-          className={`w-full py-4 font-bold text-xl rounded-full transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${
-            (isBatchMode ? hasBatchInsufficientBalance : hasInsufficientBalance)
-              ? "bg-orange-500/50 text-orange-200"
-              : "bg-primary text-black hover:bg-primary/90"
-          }`}
+          className={`w-full py-3 sm:py-4 font-bold text-base sm:text-lg md:text-xl rounded-full transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed ${(isBatchMode ? hasBatchInsufficientBalance : hasInsufficientBalance)
+            ? "bg-orange-500/50 text-orange-200"
+            : "bg-primary text-black hover:bg-primary/90"
+            }`}
         >
           {isSubmitting || isLoading
             ? "SENDING..."
             : (
-                  isBatchMode
-                    ? hasBatchInsufficientBalance
-                    : hasInsufficientBalance
-                )
+              isBatchMode
+                ? hasBatchInsufficientBalance
+                : hasInsufficientBalance
+            )
               ? "INSUFFICIENT BALANCE"
               : isBatchMode
                 ? `SEND TO ${batchRecipients.filter((r) => r.address.trim() && parseFloat(r.amount) > 0).length} RECIPIENTS`

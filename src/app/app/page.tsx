@@ -83,14 +83,14 @@ export default function Start() {
 
   if (!isHydrated) {
     return (
-      <div className="min-h-screen bg-black p-8">
+      <div className="min-h-screen bg-black-primary p-8">
         <div className="max-w-2xl mx-auto space-y-8">{/* Skeleton */}</div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-black p-4 sm:p-8">
+    <div className="min-h-screen bg-black-secondary p-4 sm:p-8">
       <div className="max-w-2xl mx-auto space-y-6">
         {/* Header with Logo and Wallet */}
         <div className="flex items-start justify-between gap-4">
@@ -105,7 +105,7 @@ export default function Start() {
           </div>
         </div>
 
-        <div className="bg-zinc-900 rounded-2xl">
+        <div className="bg-black-primary rounded-2xl">
           <div className="p-4">
             <Menu activeMenu={activeMenu} onMenuChange={handleMenuChange} />
             <ActiveContent />

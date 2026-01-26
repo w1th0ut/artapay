@@ -5,15 +5,17 @@
 
 @theme {
   --color-primary: #d89b00;
-  --color-dark-primary: #d89b00;
+  --color-primary-dark: #d89b00;
   --color-secondary: #e1c300;
   --color-accent: #696969;
   --color-dark-accent: #262626;
+  --black-primary: #1A1A1A;
+  --black-secondary: #242424;
 }
 
 @theme inline {
-  --font-sans: var(--font-poppins), ui-sans-serif, system-ui, sans-serif;
-  --font-hero: var(--font-cinzel), serif;
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+  --font-hero: var(--font-inter), sans-serif;
   --animate-marquee: marquee var(--duration) infinite linear;
   --animate-marquee-vertical: marquee-vertical var(--duration) linear infinite;
   --color-sidebar-ring: var(--sidebar-ring);
@@ -54,20 +56,26 @@
   --radius-2xl: calc(var(--radius) + 8px);
   --radius-3xl: calc(var(--radius) + 12px);
   --radius-4xl: calc(var(--radius) + 16px);
+  --black-primary: var(--black-primary);
+  --black-secondary: var(--black-secondary);
+
   @keyframes marquee {
-  from {
-    transform: translateX(0);
+    from {
+      transform: translateX(0);
     }
-  to {
-    transform: translateX(calc(-100% - var(--gap)));
+
+    to {
+      transform: translateX(calc(-100% - var(--gap)));
     }
   }
+
   @keyframes marquee-vertical {
-  from {
-    transform: translateY(0);
+    from {
+      transform: translateY(0);
     }
-  to {
-    transform: translateY(calc(-100% - var(--gap)));
+
+    to {
+      transform: translateY(calc(-100% - var(--gap)));
     }
   }
 }
@@ -120,7 +128,7 @@ body.privy-dialog-open {
   --card-foreground: oklch(0.145 0 0);
   --popover: oklch(1 0 0);
   --popover-foreground: oklch(0.145 0 0);
-  --primary: oklch(0.205 0 0);
+  --primary: #d89b00;
   --primary-foreground: oklch(0.985 0 0);
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
@@ -154,7 +162,7 @@ body.privy-dialog-open {
   --card-foreground: oklch(0.985 0 0);
   --popover: oklch(0.205 0 0);
   --popover-foreground: oklch(0.985 0 0);
-  --primary: oklch(0.922 0 0);
+  --primary: #d89b00;
   --primary-foreground: oklch(0.205 0 0);
   --secondary: oklch(0.269 0 0);
   --secondary-foreground: oklch(0.985 0 0);
@@ -185,7 +193,12 @@ body.privy-dialog-open {
   * {
     @apply border-border outline-ring/50;
   }
+
   body {
     @apply bg-background text-foreground;
+  }
+
+  .font-hero {
+    font-weight: 600;
   }
 }

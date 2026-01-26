@@ -46,18 +46,18 @@ export default function CurrencyModal({
                 onSelect(currency);
                 onClose();
               }}
-              className="w-full flex items-center gap-3 p-4 hover:bg-zinc-700 transition-colors cursor-pointer"
+              className="w-full flex items-center gap-2 sm:gap-3 p-3 sm:p-4 hover:bg-zinc-700 transition-colors cursor-pointer"
             >
               <Image
                 src={currency.icon}
                 alt={currency.name}
-                width={40}
-                height={40}
-                className="rounded-full"
+                width={32}
+                height={32}
+                className="rounded-full sm:w-10 sm:h-10"
               />
               <div className="text-left">
-                <p className="text-white font-medium">{currency.name}</p>
-                <p className="text-zinc-400 text-sm">{currency.symbol}</p>
+                <p className="text-white font-medium text-sm sm:text-base">{currency.name}</p>
+                <p className="text-zinc-400 text-xs sm:text-sm">{currency.symbol}</p>
               </div>
             </button>
           ))}

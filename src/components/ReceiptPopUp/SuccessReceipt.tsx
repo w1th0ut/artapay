@@ -57,100 +57,100 @@ export default function SuccessReceipt({
     data.type === "send" ? data.toAddress : data.fromAddress;
 
   return (
-    <div className="bg-zinc-800 rounded-2xl p-8 w-full max-w-lg">
+    <div className="bg-zinc-800 rounded-2xl p-5 sm:p-6 w-full max-w-md">
       {/* Success Icon */}
-      <div className="flex flex-col items-center mb-6">
-        <Image src={SuccessIcon} alt="Success" width={60} height={60} />
-        <p className="text-primary font-medium mt-2">Success!</p>
+      <div className="flex flex-col items-center mb-4 sm:mb-5">
+        <Image src={SuccessIcon} alt="Success" width={56} height={56} />
+        <p className="text-primary font-medium mt-2 text-sm sm:text-base">Success!</p>
       </div>
       {/* Receipt Title */}
-      <h2 className="text-white text-xl font-bold text-center mb-6">
+      <h2 className="text-white text-base sm:text-lg font-bold text-center mb-4 sm:mb-5">
         Transaction Receipt
       </h2>
-      {/* Receipt Details - Wider gap */}
-      <div className="space-y-4">
-        <div className="flex justify-between items-center gap-8">
-          <span className="text-zinc-400">Date</span>
-          <span className="text-white">
+      {/* Receipt Details */}
+      <div className="space-y-3 sm:space-y-4">
+        <div className="flex justify-between items-center gap-4">
+          <span className="text-zinc-400 text-xs sm:text-sm">Date</span>
+          <span className="text-white text-xs sm:text-sm">
             {formatReceiptDate(data.timestamp)}
           </span>
         </div>
-        <div className="flex justify-between items-center gap-8">
-          <span className="text-zinc-400">Time</span>
-          <span className="text-white">
+        <div className="flex justify-between items-center gap-4">
+          <span className="text-zinc-400 text-xs sm:text-sm">Time</span>
+          <span className="text-white text-xs sm:text-sm">
             {formatReceiptTime(data.timestamp)}
           </span>
         </div>
-        <div className="flex justify-between items-center gap-8">
-          <span className="text-zinc-400">Transaction</span>
-          <span className="text-white font-medium">
+        <div className="flex justify-between items-center gap-4">
+          <span className="text-zinc-400 text-xs sm:text-sm">Transaction</span>
+          <span className="text-white font-medium text-xs sm:text-sm">
             {getTransactionLabel()}
           </span>
         </div>
         {displayAddress && (
-          <div className="flex justify-between items-center gap-8">
-            <span className="text-zinc-400">{getAddressLabel()}</span>
-            <div className="flex items-center gap-2">
-              <span className="text-white font-mono">
+          <div className="flex justify-between items-center gap-4">
+            <span className="text-zinc-400 text-xs sm:text-sm">{getAddressLabel()}</span>
+            <div className="flex items-center gap-1.5">
+              <span className="text-white font-mono text-xs sm:text-sm">
                 {shortenAddress(displayAddress)}
               </span>
               <button
                 onClick={handleCopy}
-                className="text-zinc-400 hover:text-white"
+                className="text-zinc-400 hover:text-white p-0.5 cursor-pointer"
               >
-                {copied ? <Check size={16} /> : <Copy size={16} />}
+                {copied ? <Check size={14} /> : <Copy size={14} />}
               </button>
             </div>
           </div>
         )}
-        <div className="flex justify-between items-center gap-8">
-          <span className="text-zinc-400">Sender's currency</span>
-          <div className="flex items-center gap-2">
+        <div className="flex justify-between items-center gap-4">
+          <span className="text-zinc-400 text-xs sm:text-sm">Sender's currency</span>
+          <div className="flex items-center gap-1.5">
             <Image
               src={data.senderCurrencyIcon || data.currencyIcon}
               alt=""
-              width={20}
-              height={20}
+              width={18}
+              height={18}
             />
-            <span className="text-white">
+            <span className="text-white text-xs sm:text-sm">
               {data.senderCurrency || data.currency}
             </span>
           </div>
         </div>
-        <div className="flex justify-between items-center gap-8">
-          <span className="text-zinc-400">Receiver's currency</span>
-          <div className="flex items-center gap-2">
+        <div className="flex justify-between items-center gap-4">
+          <span className="text-zinc-400 text-xs sm:text-sm">Receiver's currency</span>
+          <div className="flex items-center gap-1.5">
             {data.type === "swap" && data.swapToCurrencyIcon ? (
               <>
                 <Image
                   src={data.swapToCurrencyIcon}
                   alt=""
-                  width={20}
-                  height={20}
+                  width={18}
+                  height={18}
                 />
-                <span className="text-white">{data.swapToCurrency}</span>
+                <span className="text-white text-xs sm:text-sm">{data.swapToCurrency}</span>
               </>
             ) : (
               <>
-                <Image src={data.currencyIcon} alt="" width={20} height={20} />
-                <span className="text-white">{data.currency}</span>
+                <Image src={data.currencyIcon} alt="" width={18} height={18} />
+                <span className="text-white text-xs sm:text-sm">{data.currency}</span>
               </>
             )}
           </div>
         </div>
         {/* Separator */}
-        <div className="border-t border-zinc-700 pt-4">
-          <div className="flex justify-between items-center gap-8">
-            <span className="text-zinc-400">Total Amount</span>
-            <span>
+        <div className="border-t border-zinc-700 pt-3 sm:pt-4">
+          <div className="flex justify-between items-center gap-4">
+            <span className="text-zinc-400 text-xs sm:text-sm">Total Amount</span>
+            <span className="text-xs sm:text-sm">
               <span className="text-primary font-bold">{data.amount}</span>
               <span className="text-white ml-1">{data.currency}</span>
             </span>
           </div>
           {data.type === "swap" && data.swapToAmount && (
-            <div className="flex justify-between items-center gap-8 mt-2">
-              <span className="text-zinc-400">Converted to</span>
-              <span>
+            <div className="flex justify-between items-center gap-4 mt-2">
+              <span className="text-zinc-400 text-xs sm:text-sm">Converted to</span>
+              <span className="text-xs sm:text-sm">
                 <span className="text-primary font-bold">
                   {data.swapToAmount}
                 </span>
@@ -163,7 +163,7 @@ export default function SuccessReceipt({
       {/* Continue Button */}
       <button
         onClick={onContinue}
-        className="w-full mt-6 py-4 border-2 border-primary text-primary font-bold text-xl rounded-xl hover:bg-primary/10 transition-colors"
+        className="w-full mt-4 sm:mt-5 py-3 border-2 border-primary text-primary font-bold text-sm sm:text-base rounded-xl hover:bg-primary/10 transition-colors cursor-pointer"
       >
         CONTINUE
       </button>

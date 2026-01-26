@@ -1,20 +1,12 @@
 import type { Metadata } from "next";
-import { Poppins, Cinzel } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
 import Web3Provider from "@/providers/Web3Provider";
 import { minikitConfig } from "../../minikit.config";
 
-const poppins = Poppins({
-  variable: "--font-poppins",
+const inter = Inter({
+  variable: "--font-inter",
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
-  display: "swap",
-});
-
-const cinzel = Cinzel({
-  variable: "--font-cinzel",
-  subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
   display: "swap",
 });
 
@@ -73,7 +65,7 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body
-        className={`${poppins.variable} ${cinzel.variable} antialiased`}
+        className={`${inter.variable} antialiased`}
       >
         <Web3Provider>{children}</Web3Provider>
       </body>

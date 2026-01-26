@@ -67,8 +67,8 @@ export default function GeneratedQRCode({
 
   const displayAmount = currency
     ? Number(
-        formatUnits(BigInt(data.request.requestedAmountRaw), currency.decimals),
-      ).toLocaleString(undefined, { maximumFractionDigits: 6 })
+      formatUnits(BigInt(data.request.requestedAmountRaw), currency.decimals),
+    ).toLocaleString(undefined, { maximumFractionDigits: 6 })
     : data.request.requestedAmountRaw;
 
   const symbol = currency?.symbol || "Token";
@@ -235,45 +235,45 @@ export default function GeneratedQRCode({
   };
 
   return (
-    <div className="flex flex-col items-center gap-4">
-      <div ref={qrRef} className="p-6 bg-white rounded-2xl">
-        <QRCodeSVG value={qrValue} size={200} />
+    <div className="flex flex-col items-center gap-3 sm:gap-4">
+      <div ref={qrRef} className="p-4 sm:p-6 bg-white rounded-xl sm:rounded-2xl">
+        <QRCodeSVG value={qrValue} size={160} className="sm:w-[200px] sm:h-[200px]" />
       </div>
       <div className="text-center">
-        <p className="text-white font-medium">Scan to pay</p>
-        <p className="text-primary text-2xl font-bold">
+        <p className="text-white font-medium text-sm sm:text-base">Scan to pay</p>
+        <p className="text-primary text-xl sm:text-2xl font-bold">
           {displayAmount} {symbol}
         </p>
-        <p className="text-zinc-400 text-sm mt-2">Expires in {formattedTime}</p>
+        <p className="text-zinc-400 text-xs sm:text-sm mt-1 sm:mt-2">Expires in {formattedTime}</p>
       </div>
 
       <div className="flex flex-col gap-2 w-full max-w-sm">
         <button
           onClick={handleShare}
-          className="w-full py-4 bg-primary text-black font-bold text-xl rounded-xl hover:bg-primary/90 transition-colors cursor-pointer flex items-center justify-center gap-2"
+          className="w-full py-2.5 sm:py-3 bg-primary text-black font-bold text-sm sm:text-base md:text-lg rounded-xl hover:bg-primary/90 transition-colors cursor-pointer flex items-center justify-center gap-2"
         >
           {isMobile ? (
             <>
-              <Share2 className="w-5 h-5" />
+              <Share2 className="w-4 h-4 sm:w-5 sm:h-5" />
               SHARE QR
             </>
           ) : (
             <>
-              <Copy className="w-5 h-5" />
+              <Copy className="w-4 h-4 sm:w-5 sm:h-5" />
               COPY QR
             </>
           )}
         </button>
         <button
           onClick={handleDownload}
-          className="w-full py-4 bg-zinc-700 text-white font-bold text-xl rounded-xl hover:bg-zinc-600 transition-colors cursor-pointer flex items-center justify-center gap-2"
+          className="w-full py-2.5 sm:py-3 bg-zinc-700 text-white font-bold text-sm sm:text-base md:text-lg rounded-xl hover:bg-zinc-600 transition-colors cursor-pointer flex items-center justify-center gap-2"
         >
-          <Download className="w-5 h-5" />
+          <Download className="w-4 h-4 sm:w-5 sm:h-5" />
           SAVE QR
         </button>
         <button
           onClick={onBack}
-          className="w-full py-4 border border-accent text-white font-bold text-xl rounded-xl hover:bg-accent/10 transition-colors cursor-pointer"
+          className="w-full py-2.5 sm:py-3 border border-accent text-white font-bold text-sm sm:text-base md:text-lg rounded-xl hover:bg-accent/10 transition-colors cursor-pointer"
         >
           CANCEL
         </button>
@@ -283,11 +283,10 @@ export default function GeneratedQRCode({
       {toast.show && (
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom-4 fade-in duration-200">
           <div
-            className={`flex items-center gap-3 px-5 py-3 rounded-xl shadow-2xl border ${
-              toast.type === "success"
-                ? "bg-zinc-900 border-primary/50 text-primary"
-                : "bg-zinc-900 border-red-500/50 text-red-400"
-            }`}
+            className={`flex items-center gap-3 px-5 py-3 rounded-xl shadow-2xl border ${toast.type === "success"
+              ? "bg-zinc-900 border-primary/50 text-primary"
+              : "bg-zinc-900 border-red-500/50 text-red-400"
+              }`}
           >
             {toast.type === "success" ? (
               <Check className="w-5 h-5" />

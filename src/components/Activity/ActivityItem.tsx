@@ -48,13 +48,13 @@ export default function ActivityItem({ activity }: ActivityItemProps) {
     return `${sign}${activity.amount} ${activity.currency}`;
   };
   return (
-    <div className="flex items-center gap-4 py-4">
+    <div className="flex items-center gap-3 sm:gap-4 py-3 sm:py-4">
       {/* Icon */}
-      <div className="w-10 h-10 rounded-full bg-zinc-800 flex items-center justify-center">
+      <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-zinc-800 flex items-center justify-center shrink-0">
         {getIcon()}
       </div>
       {/* Activity Info */}
-      <div className="flex-1">
+      <div className="flex-1 min-w-0">
         <div className="flex items-center gap-2">
           <span className="text-white font-medium">{getLabel()}</span>
         </div>

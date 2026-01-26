@@ -91,7 +91,7 @@ export default function Modal({
                     <motion.div
                         ref={modalRef}
                         id={id}
-                        className={`bg-zinc-800 rounded-2xl p-6 w-full max-w-md relative ${className}`}
+                        className={`bg-zinc-800 rounded-2xl p-4 sm:p-6 w-full max-w-md relative ${className}`}
                         role={role}
                         aria-modal={ariaModal}
                         aria-labelledby={ariaLabelledby}
@@ -123,7 +123,7 @@ export default function Modal({
                         {title && (
                             <h2
                                 id={ariaLabelledby}
-                                className="text-white text-xl font-bold text-center mb-2"
+                                className="text-white text-lg sm:text-xl font-bold text-center mb-2"
                             >
                                 {title}
                             </h2>
@@ -146,7 +146,7 @@ export default function Modal({
                         {!children && (
                             <button
                                 onClick={onClose}
-                                className="w-full mt-4 py-4 border-2 border-primary text-primary font-bold text-lg rounded-xl hover:bg-primary/10 transition-colors cursor-pointer"
+                                className="w-full mt-4 py-3 sm:py-4 border-2 border-primary text-primary font-bold text-base sm:text-lg rounded-xl hover:bg-primary/10 transition-colors cursor-pointer"
                             >
                                 CLOSE
                             </button>

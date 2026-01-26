@@ -5,7 +5,7 @@ import SendMethodItem from './SendMethodItem';
 
 export type MethodType = "scan" | "input_address";
 
-interface MethodProps { 
+interface MethodProps {
     activeMethod: MethodType;
     onMethodChange: (method: MethodType) => void;
 }
@@ -39,7 +39,7 @@ export default function SendMethod({ activeMethod, onMethodChange }: MethodProps
         [activeMethod, handleMethodClick]
     );
     return (
-        <div className='w-3/4 shadow-[inset_0_0_0_1px_rgba(105,105,105,1)] rounded-full'>
+        <div className='w-full sm:w-3/4 shadow-[inset_0_0_0_1px_rgba(105,105,105,1)] rounded-full'>
             <div className='flex justify-center items-center'>{methodItems}</div>
         </div>
     )

@@ -106,40 +106,40 @@ export default function TopUpIDRX() {
 
   const loadHistory = useCallback(
     async (page: number = 1) => {
-    if (!smartAccountAddress) {
-      setHistory([]);
-      setHistoryPage(1);
-      setHistoryPageCount(0);
-      return;
-    }
-
-    setIsLoadingHistory(true);
-    try {
-      const response = await fetch(
-        `/api/idrx/transaction-history?transactionType=MINT&walletAddress=${smartAccountAddress}&page=${page}&take=${HISTORY_TAKE}&requestType=idrx`,
-      );
-      if (!response.ok) {
-        throw new Error("Failed to fetch transaction history.");
+      if (!smartAccountAddress) {
+        setHistory([]);
+        setHistoryPage(1);
+        setHistoryPageCount(0);
+        return;
       }
-      const result = await response.json();
-      const data = result?.data;
-      const records = Array.isArray(data) ? data : data?.records || [];
-      const metadata = !Array.isArray(data) ? data?.metadata : null;
-      setHistory(records);
-      setHistoryPage(page);
-      setHistoryPageCount(metadata?.pageCount || 0);
-    } catch (err) {
-      setHistory([]);
-      setErrorModal({
-        isOpen: true,
-        title: "History Error",
-        message:
-          err instanceof Error ? err.message : "Failed to load transaction history",
-        onRetry: () => loadHistory(page),
-      });
-    } finally {
-      setIsLoadingHistory(false);
-    }
+
+      setIsLoadingHistory(true);
+      try {
+        const response = await fetch(
+          `/api/idrx/transaction-history?transactionType=MINT&walletAddress=${smartAccountAddress}&page=${page}&take=${HISTORY_TAKE}&requestType=idrx`,
+        );
+        if (!response.ok) {
+          throw new Error("Failed to fetch transaction history.");
+        }
+        const result = await response.json();
+        const data = result?.data;
+        const records = Array.isArray(data) ? data : data?.records || [];
+        const metadata = !Array.isArray(data) ? data?.metadata : null;
+        setHistory(records);
+        setHistoryPage(page);
+        setHistoryPageCount(metadata?.pageCount || 0);
+      } catch (err) {
+        setHistory([]);
+        setErrorModal({
+          isOpen: true,
+          title: "History Error",
+          message:
+            err instanceof Error ? err.message : "Failed to load transaction history",
+          onRetry: () => loadHistory(page),
+        });
+      } finally {
+        setIsLoadingHistory(false);
+      }
     },
     [smartAccountAddress],
   );
@@ -234,17 +234,17 @@ export default function TopUpIDRX() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6">
       <div className="space-y-2">
         <label className="text-zinc-400 text-sm">Receive as</label>
         <div ref={tokenMenuRef} className="relative">
           <button
             type="button"
             onClick={() => setIsTokenMenuOpen(!isTokenMenuOpen)}
-            className="w-full flex items-center justify-between p-4 bg-zinc-800 rounded-xl border border-zinc-700 hover:border-zinc-600 transition-colors cursor-pointer"
+            className="w-full flex items-center justify-between p-3 sm:p-4 bg-zinc-800 rounded-xl border border-zinc-700 hover:border-zinc-600 transition-colors cursor-pointer"
           >
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-zinc-700 flex items-center justify-center overflow-hidden">
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-zinc-700 flex items-center justify-center overflow-hidden">
                 <Image
                   src={topUpToken.icon}
                   alt={topUpToken.name}
@@ -259,9 +259,8 @@ export default function TopUpIDRX() {
               </div>
             </div>
             <ChevronDown
-              className={`text-zinc-400 transition-transform ${
-                isTokenMenuOpen ? "rotate-180" : ""
-              }`}
+              className={`text-zinc-400 transition-transform ${isTokenMenuOpen ? "rotate-180" : ""
+                }`}
               size={20}
             />
           </button>
@@ -275,9 +274,8 @@ export default function TopUpIDRX() {
                     setTopUpToken(token);
                     setIsTokenMenuOpen(false);
                   }}
-                  className={`w-full flex items-center gap-3 p-4 hover:bg-zinc-700 transition-colors cursor-pointer ${
-                    topUpToken.id === token.id ? "bg-zinc-700" : ""
-                  }`}
+                  className={`w-full flex items-center gap-3 p-4 hover:bg-zinc-700 transition-colors cursor-pointer ${topUpToken.id === token.id ? "bg-zinc-700" : ""
+                    }`}
                 >
                   <div className="w-10 h-10 rounded-full bg-zinc-600 flex items-center justify-center overflow-hidden">
                     <Image
@@ -309,7 +307,7 @@ export default function TopUpIDRX() {
           placeholder="0"
           value={amount}
           onChange={(e) => setAmount(e.target.value.replace(/[^0-9.]/g, ""))}
-          className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-4 py-3 text-white text-xl outline-none focus:border-primary"
+          className="w-full bg-zinc-800 border border-zinc-700 rounded-xl px-3 py-2.5 sm:px-4 sm:py-3 text-white text-base sm:text-lg md:text-xl outline-none focus:border-primary"
         />
         {amount && (
           <div className="text-xs text-zinc-400">
@@ -357,7 +355,7 @@ export default function TopUpIDRX() {
         disabled={
           !smartAccountAddress || isSubmitting || !hasValidAmount || isOutOfRange
         }
-        className="w-full py-4 bg-primary text-black font-bold text-xl rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        className="w-full py-3 sm:py-4 bg-primary text-black font-bold text-base sm:text-lg md:text-xl rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
         {isSubmitting ? "CREATING LINK..." : "TOP UP IDRX"}
       </button>
@@ -393,8 +391,8 @@ export default function TopUpIDRX() {
                 const amountValue = Number(item.toBeMinted || 0);
                 const amountLabel = Number.isFinite(amountValue)
                   ? amountValue.toLocaleString(undefined, {
-                      maximumFractionDigits: 2,
-                    })
+                    maximumFractionDigits: 2,
+                  })
                   : item.toBeMinted;
                 const rawToken = (item.requestType || "idrx").toLowerCase();
                 const recordToken =
@@ -458,7 +456,7 @@ export default function TopUpIDRX() {
               errorModal.onRetry?.();
               setErrorModal({ ...errorModal, isOpen: false });
             }}
-            className="w-full py-4 bg-primary text-black font-bold text-lg rounded-xl hover:bg-primary/90 transition-colors cursor-pointer"
+            className="w-full py-3 sm:py-4 bg-primary text-black font-bold text-base sm:text-lg rounded-xl hover:bg-primary/90 transition-colors cursor-pointer"
           >
             RETRY
           </button>

@@ -171,11 +171,11 @@ export default function TransactionPopup({
 
   const requestedAmount = requestedCurrency
     ? Number(
-        formatUnits(
-          BigInt(payload.request.requestedAmountRaw),
-          requestedCurrency.decimals,
-        ),
-      )
+      formatUnits(
+        BigInt(payload.request.requestedAmountRaw),
+        requestedCurrency.decimals,
+      ),
+    )
     : 0;
 
   // Fetch payment quote when fee token changes
@@ -196,11 +196,11 @@ export default function TransactionPopup({
           ],
         })) as
           | {
-              baseAmount: bigint;
-              platformFee: bigint;
-              swapFee: bigint;
-              totalRequired: bigint;
-            }
+            baseAmount: bigint;
+            platformFee: bigint;
+            swapFee: bigint;
+            totalRequired: bigint;
+          }
           | [bigint, bigint, bigint, bigint];
 
         const [baseAmount, platformFee, swapFee, totalRequired] = Array.isArray(
@@ -208,11 +208,11 @@ export default function TransactionPopup({
         )
           ? breakdown
           : [
-              breakdown.baseAmount,
-              breakdown.platformFee,
-              breakdown.swapFee,
-              breakdown.totalRequired,
-            ];
+            breakdown.baseAmount,
+            breakdown.platformFee,
+            breakdown.swapFee,
+            breakdown.totalRequired,
+          ];
 
         setQuote({
           baseAmount: BigInt(baseAmount || 0),
@@ -313,12 +313,12 @@ export default function TransactionPopup({
       multiPayments.map((p) =>
         p.id === id
           ? {
-              ...p,
-              [field]: value,
-              ...(field === "currency" && typeof value !== "string"
-                ? { balance: multiBalances[value.tokenAddress] || "0" }
-                : {}),
-            }
+            ...p,
+            [field]: value,
+            ...(field === "currency" && typeof value !== "string"
+              ? { balance: multiBalances[value.tokenAddress] || "0" }
+              : {}),
+          }
           : p,
       ),
     );
@@ -676,8 +676,8 @@ export default function TransactionPopup({
 
   return (
     <div className="fixed inset-0 bg-black/80 flex items-center justify-center p-4 z-50 overflow-y-auto">
-      <div className="w-full max-w-md max-h-[90vh] overflow-y-auto bg-zinc-800 rounded-2xl p-6 border-2 border-primary">
-        <h2 className="text-white text-xl font-bold text-center mb-6">
+      <div className="w-full max-w-md max-h-[90vh] overflow-y-auto bg-zinc-800 rounded-2xl p-4 sm:p-6 border-2 border-primary">
+        <h2 className="text-white text-lg sm:text-xl font-bold text-center mb-4 sm:mb-6">
           Payment Details
         </h2>
 
@@ -706,21 +706,19 @@ export default function TransactionPopup({
             <div className="flex gap-2">
               <button
                 onClick={() => setIsMultiMode(false)}
-                className={`px-3 py-1 text-sm rounded-lg transition-colors ${
-                  !isMultiMode
-                    ? "bg-primary text-black font-medium"
-                    : "bg-zinc-600 text-zinc-300 hover:bg-zinc-500"
-                }`}
+                className={`px-3 py-1 text-sm rounded-lg transition-colors ${!isMultiMode
+                  ? "bg-primary text-black font-medium"
+                  : "bg-zinc-600 text-zinc-300 hover:bg-zinc-500"
+                  }`}
               >
                 Single
               </button>
               <button
                 onClick={() => setIsMultiMode(true)}
-                className={`px-3 py-1 text-sm rounded-lg transition-colors ${
-                  isMultiMode
-                    ? "bg-primary text-black font-medium"
-                    : "bg-zinc-600 text-zinc-300 hover:bg-zinc-500"
-                }`}
+                className={`px-3 py-1 text-sm rounded-lg transition-colors ${isMultiMode
+                  ? "bg-primary text-black font-medium"
+                  : "bg-zinc-600 text-zinc-300 hover:bg-zinc-500"
+                  }`}
               >
                 Multi
               </button>
@@ -1046,8 +1044,8 @@ export default function TransactionPopup({
             {isLoadingBalance
               ? "..."
               : numBalance.toLocaleString(undefined, {
-                  maximumFractionDigits: 4,
-                })}{" "}
+                maximumFractionDigits: 4,
+              })}{" "}
             {payToken.symbol}
           </div>
         )}
@@ -1061,12 +1059,12 @@ export default function TransactionPopup({
               isLoadingQuote ||
               (isMultiMode
                 ? hasMultiInsufficientBalance ||
-                  hasMultiInsufficientValue ||
-                  hasMultiExcessValue ||
-                  multiPayments.every((p) => !parseFloat(p.amount))
+                hasMultiInsufficientValue ||
+                hasMultiExcessValue ||
+                multiPayments.every((p) => !parseFloat(p.amount))
                 : !quote || hasInsufficientBalance)
             }
-            className="w-full py-4 bg-primary text-black font-bold text-xl rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full py-3 sm:py-4 bg-primary text-black font-bold text-base sm:text-lg md:text-xl rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLoading
               ? "PROCESSING..."
@@ -1083,7 +1081,7 @@ export default function TransactionPopup({
           <button
             onClick={onCancel}
             disabled={isLoading}
-            className="w-full py-4 border-2 border-accent text-white font-bold text-xl rounded-xl hover:bg-accent/10 transition-colors disabled:opacity-50"
+            className="w-full py-3 sm:py-4 border-2 border-primary text-primary font-bold text-base sm:text-lg md:text-xl rounded-xl hover:bg-primary/10 transition-colors disabled:opacity-50"
           >
             CANCEL
           </button>

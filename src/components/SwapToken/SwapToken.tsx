@@ -218,7 +218,7 @@ export default function SwapToken() {
     : null;
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-4 sm:p-6 space-y-6">
       {/* Connection Status - only show after isReady and still no smartAccountAddress */}
       {isReady && !smartAccountAddress && (
         <div className="p-3 bg-yellow-500/20 border border-yellow-500 rounded-lg text-yellow-400 text-sm text-center">
@@ -342,7 +342,7 @@ export default function SwapToken() {
         <button
           onClick={handleSwapNow}
           disabled={isLoading || hasInsufficientBalance}
-          className="w-full py-4 bg-primary text-black font-bold text-xl rounded-xl hover:bg-primary/90 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full py-3 sm:py-4 bg-primary text-black font-bold text-base sm:text-lg md:text-xl rounded-xl hover:bg-primary/90 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isLoading
             ? "PROCESSING..."
@@ -392,7 +392,7 @@ export default function SwapToken() {
               errorModal.onRetry?.();
               setErrorModal({ ...errorModal, isOpen: false });
             }}
-            className="w-full py-4 bg-primary text-black font-bold text-lg rounded-xl hover:bg-primary/90 transition-colors cursor-pointer"
+            className="w-full py-3 sm:py-4 bg-primary text-black font-bold text-base sm:text-lg rounded-xl hover:bg-primary/90 transition-colors cursor-pointer"
           >
             RETRY
           </button>

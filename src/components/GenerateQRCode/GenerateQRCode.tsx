@@ -212,7 +212,7 @@ export default function GenerateQRCode() {
             placeholder="0"
             min="0"
             step="0.000001"
-            className="w-full p-4 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-primary transition-colors"
+            className="w-full p-3 sm:p-4 bg-zinc-800 border border-zinc-700 rounded-xl text-white placeholder-zinc-500 focus:outline-none focus:border-primary transition-colors text-sm sm:text-base"
           />
         </div>
 
@@ -228,7 +228,7 @@ export default function GenerateQRCode() {
         <button
           type="submit"
           disabled={!smartAccountAddress || isGenerating || isLoading}
-          className="w-full py-4 bg-primary text-black font-bold text-xl rounded-xl hover:bg-primary/90 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+          className="w-full py-3 sm:py-4 bg-primary text-black font-bold text-base sm:text-lg md:text-xl rounded-xl hover:bg-primary/90 transition-colors cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
         >
           {isGenerating ? "GENERATING..." : "GENERATE QR"}
         </button>

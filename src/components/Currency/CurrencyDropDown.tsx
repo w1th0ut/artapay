@@ -28,15 +28,15 @@ export default function CurrencyDropdown({ value, onChange }: CurrencyDropdownPr
       <button
         type="button"
         onClick={() => setIsOpen(!isOpen)}
-        className="w-full flex items-center justify-between p-4 bg-zinc-800 rounded-xl border border-zinc-700 hover:border-zinc-600 transition-colors cursor-pointer"
+        className="w-full flex items-center justify-between p-3 sm:p-4 bg-zinc-800 rounded-xl border border-zinc-700 hover:border-zinc-600 transition-colors cursor-pointer"
       >
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-zinc-700 flex items-center justify-center overflow-hidden">
-            <Image src={value.icon} alt={value.name} width={40} height={40} className="object-cover" />
+        <div className="flex items-center gap-2 sm:gap-3">
+          <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-zinc-700 flex items-center justify-center overflow-hidden">
+            <Image src={value.icon} alt={value.name} width={32} height={32} className="object-cover sm:w-10 sm:h-10" />
           </div>
           <div className="text-left">
-            <p className="text-white font-medium">{value.name}</p>
-            <p className="text-zinc-400 text-sm">{value.symbol}</p>
+            <p className="text-white font-medium text-sm sm:text-base">{value.name}</p>
+            <p className="text-zinc-400 text-xs sm:text-sm">{value.symbol}</p>
           </div>
         </div>
         <ChevronDown className={`text-zinc-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} size={20} />
@@ -48,14 +48,14 @@ export default function CurrencyDropdown({ value, onChange }: CurrencyDropdownPr
               key={currency.id}
               type="button"
               onClick={() => { onChange(currency); setIsOpen(false); }}
-              className={`w-full flex items-center gap-3 p-4 hover:bg-zinc-700 transition-colors cursor-pointer ${value.id === currency.id ? 'bg-zinc-700' : ''}`}
+              className={`w-full flex items-center gap-2 sm:gap-3 p-3 sm:p-4 hover:bg-zinc-700 transition-colors cursor-pointer ${value.id === currency.id ? 'bg-zinc-700' : ''}`}
             >
-              <div className="w-10 h-10 rounded-full bg-zinc-600 flex items-center justify-center overflow-hidden">
-                <Image src={currency.icon} alt={currency.name} width={40} height={40} className="object-cover" />
+              <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-zinc-600 flex items-center justify-center overflow-hidden">
+                <Image src={currency.icon} alt={currency.name} width={32} height={32} className="object-cover sm:w-10 sm:h-10" />
               </div>
               <div className="text-left">
-                <p className="text-white font-medium">{currency.name}</p>
-                <p className="text-zinc-400 text-sm">{currency.symbol}</p>
+                <p className="text-white font-medium text-sm sm:text-base">{currency.name}</p>
+                <p className="text-zinc-400 text-xs sm:text-sm">{currency.symbol}</p>
               </div>
             </button>
           ))}
