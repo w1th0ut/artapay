@@ -28,9 +28,9 @@ export default function FeatureCardItem({
         gsap.to(yellowOverlayRef.current, { x: 0, duration: 0.5, ease: "power2.inOut" });
 
         // Counter-swipe Hover Image Container (100% to 0 relative to parent)
-        // This keeps the hover image perfectly centered while the mask slides over it
         gsap.to(hoverImageContainerRef.current, { x: 0, duration: 0.5, ease: "power2.inOut" });
 
+        // Animate bottom section to black-third
         gsap.to(bottomSectionRef.current, { backgroundColor: "#252525", duration: 0.3 });
     };
 
@@ -40,6 +40,7 @@ export default function FeatureCardItem({
         gsap.to(yellowOverlayRef.current, { x: "-100%", duration: 0.5, ease: "power2.inOut" });
         gsap.to(hoverImageContainerRef.current, { x: "100%", duration: 0.5, ease: "power2.inOut" });
 
+        // Revert bottom section to its original dark background (black-second)
         gsap.to(bottomSectionRef.current, { backgroundColor: "transparent", duration: 0.3 });
     };
 
@@ -48,17 +49,17 @@ export default function FeatureCardItem({
             ref={cardRef}
             onMouseEnter={handleMouseEnter}
             onMouseLeave={handleMouseLeave}
-            className="w-full flex flex-col items-center justify-center bg-black-second rounded-4xl overflow-hidden cursor-pointer"
+            className="w-full flex flex-col items-center justify-center bg-black-second rounded-3xl sm:rounded-4xl overflow-hidden cursor-pointer border border-white/5"
         >
             {/* Top Section / Image Area */}
-            <div className="relative w-full h-80 overflow-hidden flex items-center justify-center">
+            <div className="relative w-full h-64 sm:h-72 lg:h-80 overflow-hidden flex items-center justify-center">
 
                 {/* 1. Default Image Layer (Bottom) */}
                 <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
                     <img
                         src={imageDefault}
                         alt={`${title} Default`}
-                        className="w-40 h-40 object-contain"
+                        className="w-32 h-32 sm:w-36 sm:h-36 lg:w-40 lg:h-40 object-contain"
                     />
                 </div>
 
@@ -75,7 +76,7 @@ export default function FeatureCardItem({
                         <img
                             src={imageHover}
                             alt={`${title} Hover`}
-                            className="w-40 h-40 object-contain"
+                            className="w-32 h-32 sm:w-36 sm:h-36 lg:w-40 lg:h-40 object-contain"
                         />
                     </div>
                 </div>
@@ -84,12 +85,12 @@ export default function FeatureCardItem({
             {/* Bottom Section */}
             <div
                 ref={bottomSectionRef}
-                className="px-10 py-10 w-full flex flex-col gap-3 text-white transition-colors duration-300 z-20"
+                className="px-6 py-8 sm:px-8 sm:py-10 lg:px-10 lg:py-10 w-full flex flex-col gap-2 sm:gap-3 text-white transition-colors duration-300 z-20"
             >
-                <div className="text-4xl font-bold tracking-tight">
+                <div className="text-2xl sm:text-3xl lg:text-4xl font-bold tracking-tight">
                     {title}
                 </div>
-                <div className="text-xl text-white/70 leading-relaxed max-w-md">
+                <div className="text-base sm:text-lg lg:text-xl text-white/70 leading-relaxed max-w-md">
                     {description}
                 </div>
             </div>

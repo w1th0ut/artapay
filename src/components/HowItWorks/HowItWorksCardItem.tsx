@@ -8,18 +8,16 @@ interface HowItWorksCardItemProps {
     image: string;
     title: string;
     description: string;
-    marqueeTitle: string;
-    marqueeItem: string[];
     isReversed?: boolean;
+    steps?: string[];
 }
 
 export default function HowItWorksCardItem({
     image,
     title,
     description,
-    marqueeTitle,
-    marqueeItem,
-    isReversed
+    isReversed,
+    steps
 }: HowItWorksCardItemProps) {
     return (
         <div className="grid grid-cols-2 w-full h-fit rounded-4xl overflow-hidden border border-white/10">
@@ -35,22 +33,17 @@ export default function HowItWorksCardItem({
                     <span className="text-2xl font-semibold">{title}</span>
                     <span className="text-lg text-white/60">{description}</span>
                 </div>
-                <div className="flex flex-col gap-4">
-                    <span className="text-xl font-medium">{marqueeTitle}</span>
-
-                    <div className="relative flex w-full flex-col items-center justify-center overflow-hidden">
-                        <Marquee reverse pauseOnHover className="[--duration:20s] text-lg text-white/60">
-                            {marqueeItem.map((item, index) => (
-                                <span key={index} className="bg-black-third p-2 rounded-md">{item}</span>
-                            ))}
-                        </Marquee>
-                    </div>
-
-                </div>
-                <div>
-
-                </div>
             </div>
-        </div>
+
+            <div className="flex flex-col gap-4">
+                {steps && steps.length > 0 && (
+                    <ol className="list-decimal list-inside text-sm sm:text-base lg:text-lg text-white/60 space-y-1 sm:space-y-2 ml-1 mt-2">
+                        {steps.map((step, idx) => (
+                            <li key={idx} className="pl-1">{step}</li>
+                        ))}
+                    </ol>
+                )}
+            </div>
+        </div >
     )
 }

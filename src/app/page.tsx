@@ -10,6 +10,8 @@ import { Footer } from '@/components/Footer';
 import { AnimatedHero } from '@/components/Hero';
 import ScrollStack, { ScrollStackItem } from '@/components/ScrollStack';
 import { sdk } from '@farcaster/miniapp-sdk';
+import FeatureCard from '@/components/FeatureCard/FeatureCard';
+import { FeatureCardMenu } from '@/components/FeatureCard';
 
 // Image paths from public folder
 const SendFeature = '/assets/Send_Feature_Scan.png';
@@ -116,7 +118,7 @@ export default function Home() {
       <AnimatedHero />
 
       {/* FeatureCards */}
-      <FeatureCards />
+      <FeatureCardMenu />
 
       <div
         className="w-full bg-black"

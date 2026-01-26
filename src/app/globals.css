@@ -9,8 +9,10 @@
   --color-secondary: #e1c300;
   --color-accent: #696969;
   --color-dark-accent: #262626;
-  --black-primary: #1A1A1A;
-  --black-secondary: #242424;
+  --color-black-first: #1A1A1A;
+  --color-black-second: #242424;
+  --color-black-third: #252525;
+  --color-yellow-prime: #d89b00;
 }
 
 @theme inline {
