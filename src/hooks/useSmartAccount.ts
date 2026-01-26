@@ -1002,7 +1002,11 @@ export function useSmartAccount() {
         const amountParsed = parseUnits(params.amount, params.decimals);
         const feeParams = await getFeeParams();
         const gasLimitEstimate =
-          220_000n + 450_000n + PAYMASTER_VERIFICATION_GAS + PAYMASTER_POST_OP_GAS + PRE_VERIFICATION_GAS;
+          220_000n +
+          450_000n +
+          PAYMASTER_VERIFICATION_GAS +
+          PAYMASTER_POST_OP_GAS +
+          PRE_VERIFICATION_GAS;
         await assertPaymasterBalance({
           token: params.tokenAddress,
           owner: address,
@@ -1154,7 +1158,11 @@ export function useSmartAccount() {
           baseCallGas + recipientCount * perTransferGas,
         );
         const gasLimitEstimate =
-          callGasLimit + 450_000n + PAYMASTER_VERIFICATION_GAS + PAYMASTER_POST_OP_GAS + PRE_VERIFICATION_GAS;
+          callGasLimit +
+          450_000n +
+          PAYMASTER_VERIFICATION_GAS +
+          PAYMASTER_POST_OP_GAS +
+          PRE_VERIFICATION_GAS;
         await assertPaymasterBalance({
           token: params.tokenAddress,
           owner: address,
@@ -1234,7 +1242,11 @@ export function useSmartAccount() {
 
         const feeParams = await getFeeParams();
         const gasLimitEstimate =
-          1_200_000n + 1_200_000n + PAYMASTER_VERIFICATION_GAS + PAYMASTER_POST_OP_GAS + PRE_VERIFICATION_GAS;
+          1_200_000n +
+          1_200_000n +
+          PAYMASTER_VERIFICATION_GAS +
+          PAYMASTER_POST_OP_GAS +
+          PRE_VERIFICATION_GAS;
         await assertPaymasterBalance({
           token: params.tokenIn,
           owner: address,
@@ -1323,6 +1335,302 @@ export function useSmartAccount() {
       }
     },
     [ensureClient, getFeeParams, waitForUserOp],
+  );
+
+  /**
+   * Swap tokens and transfer to recipient in a single UserOp
+   * For cross-token transfers: pay with Token A, recipient receives Token B
+   */
+  const swapAndTransfer = useCallback(
+    async (params: {
+      tokenIn: Address;
+      tokenOut: Address;
+      amountIn: string;
+      tokenInDecimals: number;
+      tokenOutDecimals: number;
+      recipient: Address;
+      stableSwapAddress: Address;
+      minAmountOut: bigint;
+      totalUserPays: bigint;
+      currentAllowance?: bigint;
+    }) => {
+      setError(null);
+      setIsLoading(true);
+      try {
+        const { client, address } = await ensureClient();
+        const amountParsed = parseUnits(
+          params.amountIn,
+          params.tokenInDecimals,
+        );
+        const needsApproval =
+          !params.currentAllowance ||
+          params.currentAllowance < params.totalUserPays;
+
+        const feeParams = await getFeeParams();
+        const gasLimitEstimate =
+          1_500_000n +
+          1_200_000n +
+          PAYMASTER_VERIFICATION_GAS +
+          PAYMASTER_POST_OP_GAS +
+          PRE_VERIFICATION_GAS;
+
+        await assertPaymasterBalance({
+          token: params.tokenIn,
+          owner: address,
+          spendAmount: params.totalUserPays,
+          decimals: params.tokenInDecimals,
+          gasLimit: gasLimitEstimate,
+          maxFeePerGas: feeParams.maxFeePerGas,
+        });
+
+        const validUntil = Math.floor(Date.now() / 1000) + 3600;
+        const validAfter = 0;
+        setStatus("Requesting paymaster signature for swap & transfer...");
+        const signature = await getPaymasterSignature({
+          payerAddress: address,
+          tokenAddress: params.tokenIn,
+          validUntil,
+          validAfter,
+          isActivation: false,
+        });
+
+        const paymasterData = buildPaymasterData({
+          tokenAddress: params.tokenIn,
+          payerAddress: address,
+          validUntil,
+          validAfter,
+          hasPermit: false,
+          isActivation: false,
+          signature: signature as `0x${string}`,
+        });
+
+        const calls = [];
+
+        if (needsApproval) {
+          calls.push({
+            to: params.tokenIn,
+            data: encodeFunctionData({
+              abi: ERC20_ABI,
+              functionName: "approve",
+              args: [params.stableSwapAddress, maxUint256],
+            }),
+            value: BigInt(0),
+          });
+        }
+
+        calls.push({
+          to: params.stableSwapAddress,
+          data: encodeFunctionData({
+            abi: STABLE_SWAP_ABI,
+            functionName: "swap",
+            args: [
+              amountParsed,
+              params.tokenIn,
+              params.tokenOut,
+              params.minAmountOut,
+            ],
+          }),
+          value: BigInt(0),
+        });
+
+        calls.push({
+          to: params.tokenOut,
+          data: encodeFunctionData({
+            abi: ERC20_ABI,
+            functionName: "transfer",
+            args: [params.recipient, params.minAmountOut],
+          }),
+          value: BigInt(0),
+        });
+
+        setStatus("Submitting swap & transfer UserOperation...");
+        const res = await client.sendCalls({
+          calls,
+          paymaster: PAYMASTER_ADDRESS,
+          paymasterData,
+          paymasterVerificationGasLimit: PAYMASTER_VERIFICATION_GAS,
+          paymasterPostOpGasLimit: PAYMASTER_POST_OP_GAS,
+          callGasLimit: BigInt(1_500_000),
+          verificationGasLimit: BigInt(1_200_000),
+          preVerificationGas: PRE_VERIFICATION_GAS,
+          ...feeParams,
+        });
+
+        const userOpHash = res.id as `0x${string}`;
+        setStatus("Waiting for swap & transfer execution...");
+        const receipt = await waitForUserOp(userOpHash);
+        if (!receipt.success) {
+          throw new Error(receipt.reason || "Swap & transfer failed");
+        }
+        setStatus("Swap & transfer executed on-chain");
+        return {
+          txHash: receipt.txHash || userOpHash,
+          amountSent: params.minAmountOut,
+        };
+      } catch (err) {
+        const message = transformError(err);
+        setError(message);
+        setStatus(message);
+        throw new Error(message);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [ensureClient, getFeeParams, waitForUserOp, assertPaymasterBalance],
+  );
+
+  /**
+   * swapAndBatchTransfer: Swap payToken → targetToken, then batch transfer to multiple recipients
+   * For cross-token batch transfers where user pays with different token than what recipients receive
+   */
+  const swapAndBatchTransfer = useCallback(
+    async (params: {
+      tokenIn: Address; // Token user pays with (e.g., USDC)
+      tokenOut: Address; // Token recipients receive (e.g., IDRX)
+      totalAmountIn: bigint; // Total payToken amount to swap
+      tokenInDecimals: number;
+      tokenOutDecimals: number;
+      recipients: { address: Address; amount: string }[]; // Each recipient's amount in tokenOut
+      stableSwapAddress: Address;
+      minTotalAmountOut: bigint; // Minimum total tokenOut from swap
+      currentAllowance?: bigint;
+    }) => {
+      setError(null);
+      setIsLoading(true);
+      try {
+        const { client, address } = await ensureClient();
+        const needsApproval =
+          !params.currentAllowance ||
+          params.currentAllowance < params.totalAmountIn;
+
+        const feeParams = await getFeeParams();
+        // Estimate gas: approval + swap + (transfers × recipientCount)
+        const gasLimitEstimate =
+          1_500_000n +
+          1_200_000n +
+          BigInt(params.recipients.length) * 100_000n +
+          PAYMASTER_VERIFICATION_GAS +
+          PAYMASTER_POST_OP_GAS +
+          PRE_VERIFICATION_GAS;
+
+        await assertPaymasterBalance({
+          token: params.tokenIn,
+          owner: address,
+          spendAmount: params.totalAmountIn,
+          decimals: params.tokenInDecimals,
+          gasLimit: gasLimitEstimate,
+          maxFeePerGas: feeParams.maxFeePerGas,
+        });
+
+        const validUntil = Math.floor(Date.now() / 1000) + 3600;
+        const validAfter = 0;
+        setStatus(
+          "Requesting paymaster signature for batch swap & transfer...",
+        );
+        const signature = await getPaymasterSignature({
+          payerAddress: address,
+          tokenAddress: params.tokenIn,
+          validUntil,
+          validAfter,
+          isActivation: false,
+        });
+
+        const paymasterData = buildPaymasterData({
+          tokenAddress: params.tokenIn,
+          payerAddress: address,
+          validUntil,
+          validAfter,
+          hasPermit: false,
+          isActivation: false,
+          signature: signature as `0x${string}`,
+        });
+
+        const calls = [];
+
+        // 1. Approve if needed
+        if (needsApproval) {
+          calls.push({
+            to: params.tokenIn,
+            data: encodeFunctionData({
+              abi: ERC20_ABI,
+              functionName: "approve",
+              args: [params.stableSwapAddress, maxUint256],
+            }),
+            value: BigInt(0),
+          });
+        }
+
+        // 2. Swap total payToken → targetToken
+        calls.push({
+          to: params.stableSwapAddress,
+          data: encodeFunctionData({
+            abi: STABLE_SWAP_ABI,
+            functionName: "swap",
+            args: [
+              params.totalAmountIn,
+              params.tokenIn,
+              params.tokenOut,
+              params.minTotalAmountOut,
+            ],
+          }),
+          value: BigInt(0),
+        });
+
+        // 3. Transfer to each recipient
+        for (const recipient of params.recipients) {
+          const amountParsed = parseUnits(
+            recipient.amount,
+            params.tokenOutDecimals,
+          );
+          calls.push({
+            to: params.tokenOut,
+            data: encodeFunctionData({
+              abi: ERC20_ABI,
+              functionName: "transfer",
+              args: [recipient.address, amountParsed],
+            }),
+            value: BigInt(0),
+          });
+        }
+
+        setStatus(
+          `Submitting batch swap & transfer to ${params.recipients.length} recipients...`,
+        );
+        const res = await client.sendCalls({
+          calls,
+          paymaster: PAYMASTER_ADDRESS,
+          paymasterData,
+          paymasterVerificationGasLimit: PAYMASTER_VERIFICATION_GAS,
+          paymasterPostOpGasLimit: PAYMASTER_POST_OP_GAS,
+          callGasLimit: BigInt(1_500_000 + params.recipients.length * 100_000),
+          verificationGasLimit: BigInt(1_200_000),
+          preVerificationGas: PRE_VERIFICATION_GAS,
+          ...feeParams,
+        } as Record<string, unknown>);
+        // sendCalls may return: string | { userOpHash: string } | { id: string }
+        const userOpHash =
+          typeof res === "string" ? res : res.userOpHash || res.id || res;
+        setStatus("Waiting for batch transaction confirmation...");
+        const receipt = await waitForUserOp(userOpHash as `0x${string}`);
+        if (!receipt.success) {
+          throw new Error(receipt.reason || "Batch swap & transfer failed");
+        }
+        setStatus("Batch swap & transfer executed on-chain");
+        return {
+          txHash: receipt.txHash || userOpHash,
+          recipientCount: params.recipients.length,
+          totalAmountOut: params.minTotalAmountOut,
+        };
+      } catch (err) {
+        const message = transformError(err);
+        setError(message);
+        setStatus(message);
+        throw new Error(message);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [ensureClient, getFeeParams, waitForUserOp, assertPaymasterBalance],
   );
 
   const payInvoice = useCallback(
@@ -1719,6 +2027,8 @@ export function useSmartAccount() {
     claimFaucet,
     initSmartAccount: ensureClient,
     swapTokens,
+    swapAndTransfer,
+    swapAndBatchTransfer,
     payInvoice,
     payMultiTokenInvoice,
     signMessageWithEOA,

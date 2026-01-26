@@ -1,23 +1,25 @@
 "use client";
 
 import { useState, useCallback, useEffect, useMemo } from "react";
-import { AlertTriangle, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, Plus, Trash2, ArrowRightLeft, Zap } from "lucide-react";
 import { CurrencyDropdown, Currency, currencies } from "@/components/Currency";
 import Modal from "@/components/Modal";
 import { ReceiptPopUp, ReceiptData } from "@/components/ReceiptPopUp";
 import { useSmartAccount } from "@/hooks/useSmartAccount";
 import { BASE_SEPOLIA } from "@/config/chains";
 import { env } from "@/config/env";
+import { STABLE_SWAP_ADDRESS } from "@/config/constants";
 import {
   createPublicClient,
   http,
   formatUnits,
+  parseUnits,
   getAddress,
   isAddress,
   type Address,
 } from "viem";
 import { mainnet } from "viem/chains";
-import { ERC20_ABI } from "@/config/abi";
+import { ERC20_ABI, STABLE_SWAP_ABI } from "@/config/abi";
 
 const publicClient = createPublicClient({
   chain: BASE_SEPOLIA,
@@ -85,6 +87,21 @@ export default function InputAddressContent({
     { id: "1", address: "", amount: "" },
   ]);
 
+  // Cross-token transfer state (always visible Pay With dropdown)
+  const [payToken, setPayToken] = useState<Currency>(currencies[0]);
+  const [swapQuote, setSwapQuote] = useState<{
+    amountOut: bigint;
+    fee: bigint;
+    totalUserPays: bigint;
+  } | null>(null);
+  const [isLoadingQuote, setIsLoadingQuote] = useState(false);
+
+  // Swap rate for batch mode (fetched separately from swapQuote)
+  const [swapRate, setSwapRate] = useState<{
+    ratePerUnit: number; // How much payToken per 1 unit of currency
+    feeRatePerUnit: number; // Fee in payToken per 1 unit of currency
+  } | null>(null);
+
   // Error modal state
   const [errorModal, setErrorModal] = useState<{
     isOpen: boolean;
@@ -102,6 +119,8 @@ export default function InputAddressContent({
     isReady,
     sendGaslessTransfer,
     sendBatchTransfer,
+    swapAndTransfer,
+    swapAndBatchTransfer,
     isLoading,
     status,
     error,
@@ -141,19 +160,198 @@ export default function InputAddressContent({
     fetchBalance();
   }, [fetchBalance]);
 
-  // Check balance
-  const numBalance = parseFloat(balance) || 0;
-  const numAmount = parseFloat(amountInput);
+  // Fetch pay token balance (always)
+  const [payTokenBalance, setPayTokenBalance] = useState<string>("0");
 
-  // Estimate gas fee as 0.5% of amount (heuristic since actual fee depends on Paymaster)
-  const estimatedFee = Number.isFinite(numAmount) ? numAmount * 0.005 : 0;
-  const totalRequired = Number.isFinite(numAmount)
-    ? numAmount + estimatedFee
-    : 0;
+  useEffect(() => {
+    if (!smartAccountAddress) return;
+
+    const fetchPayTokenBalance = async () => {
+      try {
+        const rawBalance = await publicClient.readContract({
+          address: payToken.tokenAddress as Address,
+          abi: ERC20_ABI,
+          functionName: "balanceOf",
+          args: [smartAccountAddress],
+        });
+        setPayTokenBalance(
+          formatUnits(rawBalance as bigint, payToken.decimals),
+        );
+      } catch (err) {
+        console.error("Failed to fetch pay token balance:", err);
+        setPayTokenBalance("0");
+      }
+    };
+
+    fetchPayTokenBalance();
+  }, [smartAccountAddress, payToken]);
+
+  // Fetch swap RATE for batch mode (independent of amountInput)
+  // This is used for batch calculations when amountInput may be empty
+  useEffect(() => {
+    if (payToken.tokenAddress === currency.tokenAddress) {
+      setSwapRate(null);
+      return;
+    }
+
+    const fetchRate = async () => {
+      try {
+        // Query: if I put 1 unit of payToken, how much currency do I get?
+        const oneUnit = parseUnits("1", payToken.decimals);
+        const rateQuote = (await publicClient.readContract({
+          address: STABLE_SWAP_ADDRESS,
+          abi: STABLE_SWAP_ABI,
+          functionName: "getSwapQuote",
+          args: [
+            payToken.tokenAddress as Address,
+            currency.tokenAddress as Address,
+            oneUnit,
+          ],
+        })) as [bigint, bigint, bigint];
+
+        // amountOutPerUnit = how much currency for 1 payToken
+        const amountOutPerUnit =
+          parseFloat(formatUnits(rateQuote[0], currency.decimals)) || 0;
+        const feePerUnit =
+          parseFloat(formatUnits(rateQuote[1], payToken.decimals)) || 0;
+
+        if (amountOutPerUnit > 0) {
+          // ratePerUnit = how much payToken for 1 currency (inverse)
+          const ratePerUnit = 1 / amountOutPerUnit;
+          const feeRatePerUnit = feePerUnit / amountOutPerUnit;
+          setSwapRate({ ratePerUnit, feeRatePerUnit });
+        } else {
+          setSwapRate(null);
+        }
+      } catch (err) {
+        console.error("Failed to fetch swap rate:", err);
+        setSwapRate(null);
+      }
+    };
+
+    fetchRate();
+  }, [payToken, currency]);
+
+  // Fetch swap quote when pay token differs from send token
+  // We need INVERSE quote: "To get X currency, how much payToken needed?"
+  // Since getSwapQuote only does forward, we calculate rate and invert
+  useEffect(() => {
+    if (!amountInput || payToken.tokenAddress === currency.tokenAddress) {
+      setSwapQuote(null);
+      return;
+    }
+
+    const fetchQuote = async () => {
+      setIsLoadingQuote(true);
+      try {
+        const desiredAmount = parseUnits(amountInput, currency.decimals);
+
+        // Query: if I put 1 unit of payToken, how much currency do I get?
+        const oneUnit = parseUnits("1", payToken.decimals);
+        const rateQuote = (await publicClient.readContract({
+          address: STABLE_SWAP_ADDRESS,
+          abi: STABLE_SWAP_ABI,
+          functionName: "getSwapQuote",
+          args: [
+            payToken.tokenAddress as Address,
+            currency.tokenAddress as Address,
+            oneUnit,
+          ],
+        })) as [bigint, bigint, bigint];
+
+        // rateQuote[0] = amountOut (currency) for 1 payToken
+        // rateQuote[2] = totalUserPays for 1 payToken (includes fee)
+        const amountOutPerUnit = rateQuote[0]; // How much currency per 1 payToken
+
+        if (amountOutPerUnit === 0n) {
+          setSwapQuote(null);
+          return;
+        }
+
+        // Calculate: to get desiredAmount of currency, need X payToken
+        // X = desiredAmount / (amountOutPerUnit / oneUnit)
+        // X = desiredAmount * oneUnit / amountOutPerUnit
+        const neededPayToken = (desiredAmount * oneUnit) / amountOutPerUnit;
+
+        // Get actual quote for this amount to get accurate fees
+        const actualQuote = (await publicClient.readContract({
+          address: STABLE_SWAP_ADDRESS,
+          abi: STABLE_SWAP_ABI,
+          functionName: "getSwapQuote",
+          args: [
+            payToken.tokenAddress as Address,
+            currency.tokenAddress as Address,
+            neededPayToken,
+          ],
+        })) as [bigint, bigint, bigint];
+
+        // Adjust if amountOut is less than desired (due to rounding/fees)
+        let adjustedNeededPayToken = neededPayToken;
+        if (actualQuote[0] < desiredAmount) {
+          // Need a bit more, add 0.5% buffer
+          adjustedNeededPayToken = (neededPayToken * 1005n) / 1000n;
+        }
+
+        // Final quote with adjusted amount
+        const finalQuote = (await publicClient.readContract({
+          address: STABLE_SWAP_ADDRESS,
+          abi: STABLE_SWAP_ABI,
+          functionName: "getSwapQuote",
+          args: [
+            payToken.tokenAddress as Address,
+            currency.tokenAddress as Address,
+            adjustedNeededPayToken,
+          ],
+        })) as [bigint, bigint, bigint];
+
+        setSwapQuote({
+          amountOut: finalQuote[0], // currency amount out
+          fee: finalQuote[1], // fee in payToken
+          totalUserPays: finalQuote[2], // total payToken needed
+        });
+      } catch (err) {
+        console.error("Failed to fetch swap quote:", err);
+        setSwapQuote(null);
+      } finally {
+        setIsLoadingQuote(false);
+      }
+    };
+
+    const timer = setTimeout(fetchQuote, 500);
+    return () => clearTimeout(timer);
+  }, [amountInput, payToken, currency]);
+
+  // Check balance (cross-token aware)
+  const numBalance = parseFloat(balance) || 0;
+  const numPayTokenBalance = parseFloat(payTokenBalance) || 0;
+  const numAmount = parseFloat(amountInput);
+  const isCrossToken = payToken.tokenAddress !== currency.tokenAddress;
+
+  // For cross-token: use swapQuote.fee, otherwise use amount * 0.5%
+  const estimatedFee = useMemo(() => {
+    if (isCrossToken && swapQuote) {
+      // Use swap fee directly (already in payToken units)
+      return parseFloat(formatUnits(swapQuote.fee, payToken.decimals)) || 0;
+    }
+    return Number.isFinite(numAmount) ? numAmount * 0.005 : 0;
+  }, [isCrossToken, swapQuote, payToken.decimals, numAmount]);
+
+  const totalRequired = useMemo(() => {
+    if (isCrossToken && swapQuote) {
+      return (
+        parseFloat(formatUnits(swapQuote.totalUserPays, payToken.decimals)) || 0
+      );
+    }
+    return Number.isFinite(numAmount) ? numAmount + numAmount * 0.005 : 0;
+  }, [isCrossToken, swapQuote, payToken.decimals, numAmount]);
+
+  // Effective balance to check against (payToken balance for cross-token, currency balance otherwise)
+  const effectiveBalance = isCrossToken ? numPayTokenBalance : numBalance;
+  const effectiveSymbol = isCrossToken ? payToken.symbol : currency.symbol;
 
   const hasInsufficientBalance =
-    Number.isFinite(numAmount) && numAmount > 0 && totalRequired > numBalance;
-  const hasNoBalance = numBalance === 0;
+    totalRequired > 0 && totalRequired > effectiveBalance;
+  const hasNoBalance = effectiveBalance === 0;
 
   // Calculate batch total
   const batchTotal = useMemo(() => {
@@ -163,11 +361,70 @@ export default function InputAddressContent({
     }, 0);
   }, [batchRecipients]);
 
-  // Estimate batch fee (0.5% of total)
-  const batchEstimatedFee = batchTotal * 0.005;
-  const batchTotalRequired = batchTotal + batchEstimatedFee;
+  // Estimate batch fee (cross-token aware)
+  // Use swapRate as fallback when swapQuote is null (batch mode)
+  const batchEstimatedFee = useMemo(() => {
+    if (isCrossToken) {
+      // First try swapQuote
+      if (swapQuote) {
+        const amountOut =
+          parseFloat(formatUnits(swapQuote.amountOut, currency.decimals)) || 0;
+        if (amountOut > 0) {
+          const feeRate =
+            parseFloat(formatUnits(swapQuote.fee, payToken.decimals)) /
+              amountOut || 0;
+          return batchTotal * feeRate;
+        }
+      }
+      // Fallback to swapRate for batch mode
+      if (swapRate) {
+        return batchTotal * swapRate.feeRatePerUnit;
+      }
+    }
+    return batchTotal * 0.005;
+  }, [
+    isCrossToken,
+    swapQuote,
+    swapRate,
+    payToken.decimals,
+    currency.decimals,
+    batchTotal,
+  ]);
+
+  // Batch total required (cross-token aware)
+  // Use swapRate as fallback when swapQuote is null (batch mode)
+  const batchTotalRequired = useMemo(() => {
+    if (isCrossToken) {
+      // First try swapQuote, then fall back to swapRate
+      if (swapQuote) {
+        const totalPay =
+          parseFloat(formatUnits(swapQuote.totalUserPays, payToken.decimals)) ||
+          0;
+        const amountOut =
+          parseFloat(formatUnits(swapQuote.amountOut, currency.decimals)) || 0;
+        if (amountOut > 0) {
+          const rate = totalPay / amountOut;
+          return batchTotal * rate;
+        }
+      }
+      // Fallback to swapRate for batch mode
+      if (swapRate) {
+        return batchTotal * swapRate.ratePerUnit;
+      }
+    }
+    return batchTotal + batchEstimatedFee;
+  }, [
+    isCrossToken,
+    swapQuote,
+    swapRate,
+    payToken.decimals,
+    currency.decimals,
+    batchTotal,
+    batchEstimatedFee,
+  ]);
+
   const hasBatchInsufficientBalance =
-    batchTotal > 0 && batchTotalRequired > numBalance;
+    batchTotal > 0 && batchTotalRequired > effectiveBalance;
 
   // Add recipient row
   const addRecipient = useCallback(() => {
@@ -279,7 +536,43 @@ export default function InputAddressContent({
       try {
         if (onSend) {
           await onSend({ currency, address: recipient, amount: amountValue });
+        } else if (
+          payToken.tokenAddress !== currency.tokenAddress &&
+          swapQuote
+        ) {
+          // Cross-token transfer: swap + transfer
+          const result = await swapAndTransfer({
+            tokenIn: payToken.tokenAddress as Address,
+            tokenOut: currency.tokenAddress as Address,
+            amountIn: formatUnits(swapQuote.totalUserPays, payToken.decimals),
+            tokenInDecimals: payToken.decimals,
+            tokenOutDecimals: currency.decimals,
+            recipient,
+            stableSwapAddress: STABLE_SWAP_ADDRESS,
+            minAmountOut: parseUnits(amountValue.toString(), currency.decimals),
+            totalUserPays: swapQuote.totalUserPays,
+          });
+          // Show success receipt
+          setReceipt({
+            id: result.txHash,
+            type: "send",
+            status: "success",
+            timestamp: new Date(),
+            amount: amountValue,
+            currency: currency.symbol,
+            currencyIcon: currency.icon,
+            senderCurrency: payToken.symbol, // Sender paid with different token
+            senderCurrencyIcon: payToken.icon,
+            toAddress: recipient,
+            txHash: result.txHash,
+          });
+          setShowReceipt(true);
+          await fetchBalance();
+          // Reset form
+          setAddress("");
+          setAmountInput("");
         } else {
+          // Same token transfer
           const txHash = await sendGaslessTransfer({
             recipient,
             amount: amountValue.toString(),
@@ -331,6 +624,9 @@ export default function InputAddressContent({
       onSend,
       hasInsufficientBalance,
       sendGaslessTransfer,
+      swapAndTransfer,
+      swapQuote,
+      payToken,
       fetchBalance,
     ],
   );
@@ -412,11 +708,42 @@ export default function InputAddressContent({
           amount: r.amount,
         }));
 
-        const result = await sendBatchTransfer({
-          recipients: validRecipients,
-          tokenAddress: currency.tokenAddress as Address,
-          decimals: currency.decimals,
-        });
+        // Check if cross-token batch transfer
+        const isBatchCrossToken =
+          payToken.tokenAddress !== currency.tokenAddress;
+
+        let result: { txHash: string; recipientCount: number };
+
+        if (isBatchCrossToken && swapRate) {
+          // Cross-token batch: swap payToken → currency, then batch transfer
+          // Calculate total payToken needed
+          const totalPayTokenNeeded = parseUnits(
+            batchTotalRequired.toFixed(payToken.decimals),
+            payToken.decimals,
+          );
+          const minTotalCurrencyOut = parseUnits(
+            batchTotal.toFixed(currency.decimals),
+            currency.decimals,
+          );
+
+          result = await swapAndBatchTransfer({
+            tokenIn: payToken.tokenAddress as Address,
+            tokenOut: currency.tokenAddress as Address,
+            totalAmountIn: totalPayTokenNeeded,
+            tokenInDecimals: payToken.decimals,
+            tokenOutDecimals: currency.decimals,
+            recipients: validRecipients,
+            stableSwapAddress: STABLE_SWAP_ADDRESS,
+            minTotalAmountOut: minTotalCurrencyOut,
+          });
+        } else {
+          // Same token batch transfer
+          result = await sendBatchTransfer({
+            recipients: validRecipients,
+            tokenAddress: currency.tokenAddress as Address,
+            decimals: currency.decimals,
+          });
+        }
 
         // Show success receipt
         setReceipt({
@@ -427,6 +754,8 @@ export default function InputAddressContent({
           amount: batchTotal,
           currency: currency.symbol,
           currencyIcon: currency.icon,
+          senderCurrency: isBatchCrossToken ? payToken.symbol : undefined,
+          senderCurrencyIcon: isBatchCrossToken ? payToken.icon : undefined,
           toAddress: `${result.recipientCount} recipients`,
           txHash: result.txHash,
         });
@@ -456,11 +785,15 @@ export default function InputAddressContent({
     [
       batchRecipients,
       batchTotal,
+      batchTotalRequired,
       batchValidationErrors,
       hasBatchValidRecipients,
       hasBatchInsufficientBalance,
       currency,
+      payToken,
+      swapRate,
       sendBatchTransfer,
+      swapAndBatchTransfer,
       fetchBalance,
     ],
   );
@@ -484,6 +817,51 @@ export default function InputAddressContent({
           <CurrencyDropdown value={currency} onChange={setCurrency} />
         </div>
 
+        {/* Pay With (always visible) */}
+        <div className="space-y-2">
+          <label className="text-white font-medium flex items-center gap-2">
+            <ArrowRightLeft className="w-4 h-4 text-primary" />
+            Pay with
+          </label>
+          <CurrencyDropdown value={payToken} onChange={setPayToken} />
+          <div className="text-xs text-zinc-500">
+            Balance:{" "}
+            {parseFloat(payTokenBalance).toLocaleString(undefined, {
+              maximumFractionDigits: 4,
+            })}{" "}
+            {payToken.symbol}
+          </div>
+
+          {/* Swap Quote Display (when pay token differs from send token) */}
+          {payToken.tokenAddress !== currency.tokenAddress &&
+            swapQuote &&
+            amountInput && (
+              <div className="p-3 bg-zinc-800/50 rounded-lg space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-zinc-400">You pay</span>
+                  <span className="text-white font-medium">
+                    {formatUnits(swapQuote.totalUserPays, payToken.decimals)}{" "}
+                    {payToken.symbol}
+                  </span>
+                </div>
+                <div className="flex justify-between text-xs">
+                  <span className="text-zinc-500">Swap fee</span>
+                  <span className="text-zinc-400">
+                    ~{formatUnits(swapQuote.fee, payToken.decimals)}{" "}
+                    {payToken.symbol}
+                  </span>
+                </div>
+              </div>
+            )}
+          {payToken.tokenAddress !== currency.tokenAddress &&
+            isLoadingQuote && (
+              <div className="text-xs text-zinc-500 animate-pulse">
+                Getting quote...
+              </div>
+            )}
+        </div>
+
+        {/* Batch Transfer Toggle */}
         <div className="flex items-center justify-between p-3 bg-zinc-800/50 border border-zinc-700 rounded-xl">
           <div className="text-sm">
             <span className="text-white font-medium">Batch Transfer</span>
@@ -495,7 +873,6 @@ export default function InputAddressContent({
             type="button"
             onClick={() => {
               setIsBatchMode(!isBatchMode);
-              // Reset forms when switching modes
               if (!isBatchMode) {
                 setAddress("");
                 setAmountInput("");
@@ -512,6 +889,7 @@ export default function InputAddressContent({
             {isBatchMode ? "ON" : "OFF"}
           </button>
         </div>
+
         {isBatchMode ? (
           <div className="space-y-4">
             {/* Batch Recipients List */}
@@ -604,13 +982,15 @@ export default function InputAddressContent({
                 </span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-zinc-400">Est. Fee (0.5%)</span>
+                <span className="text-zinc-400">
+                  Est. Fee {isCrossToken ? "(swap)" : "(0.5%)"}
+                </span>
                 <span className="text-zinc-300">
                   ~
                   {batchEstimatedFee.toLocaleString(undefined, {
                     maximumFractionDigits: 6,
                   })}{" "}
-                  {currency.symbol}
+                  {effectiveSymbol}
                 </span>
               </div>
               <div className="flex justify-between text-sm border-t border-zinc-700 pt-2">
@@ -619,11 +999,13 @@ export default function InputAddressContent({
                   {batchTotalRequired.toLocaleString(undefined, {
                     maximumFractionDigits: 4,
                   })}{" "}
-                  {currency.symbol}
+                  {effectiveSymbol}
                 </span>
               </div>
               <div className="flex justify-between text-sm">
-                <span className="text-zinc-400">Your Balance</span>
+                <span className="text-zinc-400">
+                  Your Balance ({effectiveSymbol})
+                </span>
                 <span
                   className={
                     hasBatchInsufficientBalance
@@ -631,10 +1013,10 @@ export default function InputAddressContent({
                       : "text-green-400"
                   }
                 >
-                  {numBalance.toLocaleString(undefined, {
+                  {effectiveBalance.toLocaleString(undefined, {
                     maximumFractionDigits: 4,
                   })}{" "}
-                  {currency.symbol}
+                  {effectiveSymbol}
                 </span>
               </div>
             </div>
@@ -661,8 +1043,8 @@ export default function InputAddressContent({
                   {batchTotalRequired.toLocaleString(undefined, {
                     maximumFractionDigits: 4,
                   })}{" "}
-                  {currency.symbol}, have{" "}
-                  {numBalance.toLocaleString(undefined, {
+                  {effectiveSymbol}, have{" "}
+                  {effectiveBalance.toLocaleString(undefined, {
                     maximumFractionDigits: 4,
                   })}
                 </span>
@@ -688,13 +1070,12 @@ export default function InputAddressContent({
                 <label className="text-white font-medium">Amount</label>
                 {smartAccountAddress && (
                   <span className="text-xs text-zinc-400">
-                    Balance:{" "}
+                    Balance ({effectiveSymbol}):{" "}
                     {isLoadingBalance
                       ? "..."
-                      : numBalance.toLocaleString(undefined, {
+                      : effectiveBalance.toLocaleString(undefined, {
                           maximumFractionDigits: 4,
-                        })}{" "}
-                    {currency.symbol}
+                        })}
                   </span>
                 )}
               </div>
@@ -714,7 +1095,7 @@ export default function InputAddressContent({
                     {estimatedFee.toLocaleString(undefined, {
                       maximumFractionDigits: 6,
                     })}{" "}
-                    {currency.symbol} (0.5%)
+                    {effectiveSymbol} {isCrossToken ? "(swap)" : "(0.5%)"}
                   </div>
                 )}
             </div>
@@ -728,7 +1109,7 @@ export default function InputAddressContent({
                   {totalRequired.toLocaleString(undefined, {
                     maximumFractionDigits: 4,
                   })}{" "}
-                  {currency.symbol} (incl. fee)
+                  {effectiveSymbol} (incl. fee)
                 </span>
               </div>
             )}
@@ -737,7 +1118,7 @@ export default function InputAddressContent({
             {smartAccountAddress && hasNoBalance && amountInput === "" && (
               <div className="flex items-center gap-2 p-3 bg-zinc-700/50 border border-zinc-600 rounded-lg text-zinc-400 text-sm">
                 <AlertTriangle className="w-4 h-4 shrink-0" />
-                <span>You don&apos;t have any {currency.symbol} tokens</span>
+                <span>You don&apos;t have any {effectiveSymbol} tokens</span>
               </div>
             )}
 

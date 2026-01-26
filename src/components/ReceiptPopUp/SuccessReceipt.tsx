@@ -1,20 +1,29 @@
 "use client";
 
-import Image from 'next/image';
-import { Copy, Check } from 'lucide-react';
-import { useState } from 'react';
-import { ReceiptData, formatReceiptDate, formatReceiptTime, shortenAddress } from './Receipt';
-import SuccessIcon from '@/assets/Success.svg';
+import Image from "next/image";
+import { Copy, Check } from "lucide-react";
+import { useState } from "react";
+import {
+  ReceiptData,
+  formatReceiptDate,
+  formatReceiptTime,
+  shortenAddress,
+} from "./Receipt";
+import SuccessIcon from "@/assets/Success.svg";
 
 interface SuccessReceiptProps {
   data: ReceiptData;
   onContinue: () => void;
 }
 
-export default function SuccessReceipt({ data, onContinue }: SuccessReceiptProps) {
+export default function SuccessReceipt({
+  data,
+  onContinue,
+}: SuccessReceiptProps) {
   const [copied, setCopied] = useState(false);
   const handleCopy = async () => {
-    const addressToCopy = data.type === 'send' ? data.toAddress : data.fromAddress;
+    const addressToCopy =
+      data.type === "send" ? data.toAddress : data.fromAddress;
     if (addressToCopy) {
       await navigator.clipboard.writeText(addressToCopy);
       setCopied(true);
@@ -24,22 +33,29 @@ export default function SuccessReceipt({ data, onContinue }: SuccessReceiptProps
 
   const getTransactionLabel = () => {
     switch (data.type) {
-      case 'send': return 'Send Token';
-      case 'receive': return 'Receive Token';
-      case 'swap': return 'Swap Token';
+      case "send":
+        return "Send Token";
+      case "receive":
+        return "Receive Token";
+      case "swap":
+        return "Swap Token";
     }
   };
 
   const getAddressLabel = () => {
     switch (data.type) {
-      case 'send': return 'Sent to';
-      case 'receive': return 'Received from';
-      case 'swap': return 'Swapped via';
+      case "send":
+        return "Sent to";
+      case "receive":
+        return "Received from";
+      case "swap":
+        return "Swapped via";
     }
   };
 
-  const displayAddress = data.type === 'send' ? data.toAddress : data.fromAddress;
-  
+  const displayAddress =
+    data.type === "send" ? data.toAddress : data.fromAddress;
+
   return (
     <div className="bg-zinc-800 rounded-2xl p-8 w-full max-w-lg">
       {/* Success Icon */}
@@ -55,22 +71,33 @@ export default function SuccessReceipt({ data, onContinue }: SuccessReceiptProps
       <div className="space-y-4">
         <div className="flex justify-between items-center gap-8">
           <span className="text-zinc-400">Date</span>
-          <span className="text-white">{formatReceiptDate(data.timestamp)}</span>
+          <span className="text-white">
+            {formatReceiptDate(data.timestamp)}
+          </span>
         </div>
         <div className="flex justify-between items-center gap-8">
           <span className="text-zinc-400">Time</span>
-          <span className="text-white">{formatReceiptTime(data.timestamp)}</span>
+          <span className="text-white">
+            {formatReceiptTime(data.timestamp)}
+          </span>
         </div>
         <div className="flex justify-between items-center gap-8">
           <span className="text-zinc-400">Transaction</span>
-          <span className="text-white font-medium">{getTransactionLabel()}</span>
+          <span className="text-white font-medium">
+            {getTransactionLabel()}
+          </span>
         </div>
         {displayAddress && (
           <div className="flex justify-between items-center gap-8">
             <span className="text-zinc-400">{getAddressLabel()}</span>
             <div className="flex items-center gap-2">
-              <span className="text-white font-mono">{shortenAddress(displayAddress)}</span>
-              <button onClick={handleCopy} className="text-zinc-400 hover:text-white">
+              <span className="text-white font-mono">
+                {shortenAddress(displayAddress)}
+              </span>
+              <button
+                onClick={handleCopy}
+                className="text-zinc-400 hover:text-white"
+              >
                 {copied ? <Check size={16} /> : <Copy size={16} />}
               </button>
             </div>
@@ -79,16 +106,28 @@ export default function SuccessReceipt({ data, onContinue }: SuccessReceiptProps
         <div className="flex justify-between items-center gap-8">
           <span className="text-zinc-400">Sender's currency</span>
           <div className="flex items-center gap-2">
-            <Image src={data.currencyIcon} alt="" width={20} height={20} />
-            <span className="text-white">{data.currency}</span>
+            <Image
+              src={data.senderCurrencyIcon || data.currencyIcon}
+              alt=""
+              width={20}
+              height={20}
+            />
+            <span className="text-white">
+              {data.senderCurrency || data.currency}
+            </span>
           </div>
         </div>
         <div className="flex justify-between items-center gap-8">
           <span className="text-zinc-400">Receiver's currency</span>
           <div className="flex items-center gap-2">
-            {data.type === 'swap' && data.swapToCurrencyIcon ? (
+            {data.type === "swap" && data.swapToCurrencyIcon ? (
               <>
-                <Image src={data.swapToCurrencyIcon} alt="" width={20} height={20} />
+                <Image
+                  src={data.swapToCurrencyIcon}
+                  alt=""
+                  width={20}
+                  height={20}
+                />
                 <span className="text-white">{data.swapToCurrency}</span>
               </>
             ) : (
@@ -108,11 +147,13 @@ export default function SuccessReceipt({ data, onContinue }: SuccessReceiptProps
               <span className="text-white ml-1">{data.currency}</span>
             </span>
           </div>
-          {data.type === 'swap' && data.swapToAmount && (
+          {data.type === "swap" && data.swapToAmount && (
             <div className="flex justify-between items-center gap-8 mt-2">
               <span className="text-zinc-400">Converted to</span>
               <span>
-                <span className="text-primary font-bold">{data.swapToAmount}</span>
+                <span className="text-primary font-bold">
+                  {data.swapToAmount}
+                </span>
                 <span className="text-white ml-1">{data.swapToCurrency}</span>
               </span>
             </div>
