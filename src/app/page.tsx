@@ -8,15 +8,9 @@ import { FeatureCards } from '@/components/FeatureCards';
 import TechStack from '@/components/TechStack/TechStack';
 import { Footer } from '@/components/Footer';
 import { AnimatedHero } from '@/components/Hero';
-import ScrollStack, { ScrollStackItem } from '@/components/ScrollStack';
 import { sdk } from '@farcaster/miniapp-sdk';
-import FeatureCard from '@/components/FeatureCard/FeatureCard';
 import { FeatureCardMenu } from '@/components/FeatureCard';
-
-// Image paths from public folder
-const SendFeature = '/assets/Send_Feature_Scan.png';
-const ReceiveFeature = '/assets/Receive_Feature.png';
-const SwapFeature = '/assets/Swap_Feature.png';
+import { HowItWorksSection } from '@/components/HowItWorks';
 
 // Register ScrollTrigger plugin
 if (typeof window !== "undefined") {
@@ -120,36 +114,8 @@ export default function Home() {
       {/* FeatureCards */}
       <FeatureCardMenu />
 
-      <div
-        className="w-full bg-black"
-        style={{ scrollSnapAlign: 'start', scrollSnapStop: 'always' }}
-      >
-        <ScrollStack
-          itemDistance={150}
-          itemScale={0.04}
-          itemStackDistance={40}
-          stackPosition="20%"
-          baseScale={0.9}
-          blurAmount={2}
-          useWindowScroll={true}
-        >
-          <ScrollStackItem
-            image={SendFeature}
-            label="Send to Anyone"
-            description="Send stablecoin to any recipient with scan QR or Address."
-          />
-          <ScrollStackItem
-            image={ReceiveFeature}
-            label="Receive from Anyone"
-            description="Accept global payments with minimal fees."
-          />
-          <ScrollStackItem
-            image={SwapFeature}
-            label="Swap to Anything"
-            description="Swap to any stablecoin you need in one step."
-          />
-        </ScrollStack>
-      </div>
+      {/* How It Works Section */}
+      <HowItWorksSection />
 
       <TechStack />
 

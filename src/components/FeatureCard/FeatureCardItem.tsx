@@ -1,7 +1,13 @@
 "use client";
 
-import React, { useRef } from "react";
+import React, { useRef, useLayoutEffect } from "react";
 import gsap from "gsap";
+import { ScrollTrigger } from "gsap/ScrollTrigger";
+
+// Register ScrollTrigger
+if (typeof window !== "undefined") {
+    gsap.registerPlugin(ScrollTrigger);
+}
 
 interface FeatureCardItemProps {
     imageDefault: string;
@@ -21,35 +27,38 @@ export default function FeatureCardItem({
     const hoverImageContainerRef = useRef<HTMLDivElement>(null);
     const bottomSectionRef = useRef<HTMLDivElement>(null);
 
-    const handleMouseEnter = () => {
-        gsap.to(cardRef.current, { scale: 1.02, duration: 0.3, ease: "power2.out" });
+    useLayoutEffect(() => {
+        const ctx = gsap.context(() => {
+            const tl = gsap.timeline({
+                paused: true,
+                defaults: { duration: 0.5, ease: "power2.inOut" }
+            });
 
-        // Swipe Yellow Overlay from left (-100% to 0)
-        gsap.to(yellowOverlayRef.current, { x: 0, duration: 0.5, ease: "power2.inOut" });
+            // Set up the animation sequence (same as hover)
+            tl.to(cardRef.current, { scale: 1.02, duration: 0.3, ease: "power2.out" }, 0)
+                .to(yellowOverlayRef.current, { x: 0 }, 0)
+                .to(hoverImageContainerRef.current, { x: 0 }, 0)
+                .to(bottomSectionRef.current, { backgroundColor: "#252525", duration: 0.3 }, 0);
 
-        // Counter-swipe Hover Image Container (100% to 0 relative to parent)
-        gsap.to(hoverImageContainerRef.current, { x: 0, duration: 0.5, ease: "power2.inOut" });
+            ScrollTrigger.create({
+                trigger: cardRef.current,
+                start: "top 40%", // Aktif saat bagian atas kartu mencapai 70% layar dari atas
+                end: "bottom 60%", // Nonaktif saat bagian bawah kartu mencapai 30% layar dari atas
+                onEnter: () => tl.play(),
+                onLeave: () => tl.reverse(),
+                onEnterBack: () => tl.play(),
+                onLeaveBack: () => tl.reverse(),
+                // scrub: true, // Opsional: jika ingin animasi mengikuti scroll secara halus
+            });
+        }, cardRef);
 
-        // Animate bottom section to black-third
-        gsap.to(bottomSectionRef.current, { backgroundColor: "#252525", duration: 0.3 });
-    };
-
-    const handleMouseLeave = () => {
-        gsap.to(cardRef.current, { scale: 1, duration: 0.3, ease: "power2.out" });
-
-        gsap.to(yellowOverlayRef.current, { x: "-100%", duration: 0.5, ease: "power2.inOut" });
-        gsap.to(hoverImageContainerRef.current, { x: "100%", duration: 0.5, ease: "power2.inOut" });
-
-        // Revert bottom section to its original dark background (black-second)
-        gsap.to(bottomSectionRef.current, { backgroundColor: "transparent", duration: 0.3 });
-    };
+        return () => ctx.revert();
+    }, []);
 
     return (
         <div
             ref={cardRef}
-            onMouseEnter={handleMouseEnter}
-            onMouseLeave={handleMouseLeave}
-            className="w-full flex flex-col items-center justify-center bg-black-second rounded-3xl sm:rounded-4xl overflow-hidden cursor-pointer border border-white/5"
+            className="w-full flex flex-col items-center justify-center bg-black-second rounded-3xl sm:rounded-4xl overflow-hidden border border-white/5 transition-transform duration-300"
         >
             {/* Top Section / Image Area */}
             <div className="relative w-full h-64 sm:h-72 lg:h-80 overflow-hidden flex items-center justify-center">

@@ -2,10 +2,9 @@
 
 import HowItWorksCardItem from "./HowItWorksCardItem";
 
-import SendFeature from '@/app/assets/Send_Feature_Scan.png';
-import ReceiveFeature from '@/app/assets/Receive_Feature.png';
-import SwapFeature from '@/app/assets/Swap_Feature.png';
-import TopupFeature from '@/app/assets/Topup_Feature.png';
+import SendFeature from '@/assets/Send_Feature_Scan.png';
+import ReceiveFeature from '@/assets/Receive_Feature.png';
+import SwapFeature from '@/assets/Swap_Feature.png';
 
 const howItWorks = [
     {
@@ -27,11 +26,6 @@ const howItWorks = [
         image: SwapFeature.src,
         title: "Swap",
         description: "Set the amount and choose which stablecoin currency you want to convert your token into.",
-    },
-    {
-        image: TopupFeature.src,
-        title: "Top Up",
-        description: "Set the amount and choose which stablecoin currency you want to convert your token into.",
     }
 ];
 
@@ -44,6 +38,7 @@ export default function HowItWorksCard() {
                     image={item.image}
                     title={item.title}
                     description={item.description}
+                    steps={item.steps}
                     isReversed={index % 2 !== 0}
                 />
             ))}
