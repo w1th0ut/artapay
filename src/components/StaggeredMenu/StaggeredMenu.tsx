@@ -575,11 +575,10 @@ export const StaggeredMenu: React.FC<StaggeredMenuProps> = ({
 
   return (
     <div
-      className={`sm-scope z-40 pointer-events-none ${
-        isFixed
-          ? "fixed top-0 left-0 w-screen h-screen overflow-hidden"
-          : "w-full h-full"
-      }`}
+      className={`sm-scope z-40 pointer-events-none ${isFixed
+        ? "fixed top-0 left-0 w-screen h-screen overflow-hidden"
+        : "w-full h-full"
+        }`}
       style={isFixed ? { height: "100dvh" } : undefined}
     >
       <div
@@ -631,7 +630,7 @@ export const StaggeredMenu: React.FC<StaggeredMenuProps> = ({
             backdropFilter: hasBackdropBlur ? "blur(12px)" : "none",
             WebkitBackdropFilter: hasBackdropBlur ? "blur(12px)" : "none",
             backgroundColor: hasBackdropBlur
-              ? "rgba(0, 0, 0, 0.5)"
+              ? "rgba(26, 26, 26, 0.8)"
               : "transparent",
           }}
         >
@@ -651,9 +650,8 @@ export const StaggeredMenu: React.FC<StaggeredMenuProps> = ({
 
           <button
             ref={toggleBtnRef}
-            className={`sm-toggle relative inline-flex items-center gap-[0.3rem] bg-transparent border-0 cursor-pointer font-medium leading-none overflow-visible pointer-events-auto ${
-              open ? "text-black" : "text-[#e9e9ef]"
-            }`}
+            className={`sm-toggle relative inline-flex items-center gap-[0.3rem] bg-transparent border-0 cursor-pointer font-medium leading-none overflow-visible pointer-events-auto ${open ? "text-black" : "text-[#e9e9ef]"
+              }`}
             aria-label={open ? "Close menu" : "Open menu"}
             aria-expanded={open}
             aria-controls="staggered-menu-panel"
@@ -700,7 +698,7 @@ export const StaggeredMenu: React.FC<StaggeredMenuProps> = ({
         <aside
           id="staggered-menu-panel"
           ref={panelRef}
-          className="staggered-menu-panel absolute top-0 left-0 w-full h-full bg-black flex flex-col p-[5em_1.5em_1.5em_1.5em] sm:p-[6em_2em_2em_2em] lg:p-[8em_2em_2em_10em] overflow-y-auto z-10 backdrop-blur-[12px] pointer-events-auto"
+          className="staggered-menu-panel absolute top-0 left-0 w-full h-full bg-black-first flex flex-col p-[5em_1.5em_1.5em_1.5em] sm:p-[6em_2em_2em_2em] lg:p-[8em_2em_2em_10em] overflow-y-auto z-10 backdrop-blur-[12px] pointer-events-auto"
           style={{ WebkitBackdropFilter: "blur(12px)" }}
           aria-hidden={!open}
         >
@@ -786,7 +784,7 @@ export const StaggeredMenu: React.FC<StaggeredMenuProps> = ({
 .sm-scope .sm-panel-itemWrap { position: relative; overflow: hidden; line-height: 1; }
 .sm-scope .sm-icon-line { position: absolute; left: 50%; top: 50%; width: 100%; height: 2px; background: currentColor; border-radius: 2px; transform: translate(-50%, -50%); will-change: transform; }
 .sm-scope .sm-line { display: none !important; }
-.sm-scope .staggered-menu-panel { position: absolute; top: 0; right: 0; width: 100%; height: 100%; background: black; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); display: flex; flex-direction: column; padding: 8em 2em 2em 10em; overflow-y: auto; z-index: 10; visibility: hidden; }
+.sm-scope .staggered-menu-panel { position: absolute; top: 0; right: 0; width: 100%; height: 100%; background: #1A1A1A; backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px); display: flex; flex-direction: column; padding: 8em 2em 2em 10em; overflow-y: auto; z-index: 10; visibility: hidden; }
 .sm-scope .staggered-menu-panel { overscroll-behavior: contain; -webkit-overflow-scrolling: touch; }
 .sm-scope [data-position='left'] .staggered-menu-panel { right: auto; left: 0; }
 .sm-scope .sm-prelayers { position: absolute; top: 0; right: 0; bottom: 0; width: 100%; pointer-events: none; z-index: 5; visibility: hidden; }

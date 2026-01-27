@@ -90,7 +90,7 @@ export default function Home() {
   }, []);
 
   return (
-    <div className='min-h-screen bg-black'>
+    <div className='min-h-screen bg-black-first'>
       <StaggeredMenu
         isFixed={true}
         position="right"
@@ -124,7 +124,7 @@ export default function Home() {
         ref={footerContainerRef}
         className="min-h-screen w-full relative"
         style={{
-          backgroundColor: '#000000',
+          backgroundColor: '#1A1A1A',
           scrollSnapAlign: 'start',
           scrollSnapStop: 'always'
         }}

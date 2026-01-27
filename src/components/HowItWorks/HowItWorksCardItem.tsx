@@ -30,11 +30,11 @@ export default function HowItWorksCardItem({
             {/* Content Section */}
             <div className="bg-black-second flex flex-col w-full lg:w-1/2 h-auto px-6 sm:px-12 lg:px-20 py-10 lg:py-16 justify-center gap-6 text-white text-center lg:text-left transition-all duration-300">
                 <div className="flex flex-col gap-4">
-                    <span className="text-xl sm:text-2xl lg:text-3xl font-semibold">{title}</span>
-                    <span className="text-base sm:text-lg text-white/60 leading-relaxed">{description}</span>
+                    <span className="text-base sm:text-2xl lg:text-3xl font-normal">{title}</span>
+                    <span className="text-xs sm:text-base lg:text-lg text-white/60 leading-relaxed font-normal">{description}</span>
 
                     {steps && steps.length > 0 && (
-                        <ol className="list-decimal list-inside text-sm sm:text-base text-white/60 space-y-2 ml-1 mt-4 text-left mx-auto lg:mx-0 max-w-md">
+                        <ol className="list-decimal list-inside text-xs sm:text-base lg:text-lg text-white/60 space-y-2 ml-1 mt-4 text-left mx-auto lg:mx-0 max-w-md font-normal">
                             {steps.map((step, idx) => (
                                 <li key={idx} className="pl-1">{step}</li>
                             ))}

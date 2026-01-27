@@ -219,11 +219,11 @@ export default function AnimatedHero() {
       {/* Left Column - Hero Text (Black Container) */}
       <div
         ref={leftColumnRef}
-        className="w-full md:w-1/2 min-h-[60vh] md:min-h-screen flex flex-col justify-center items-start px-4 sm:px-8 md:px-16 pt-20 pb-12 md:py-0 relative bg-black z-10"
+        className="w-full md:w-1/2 min-h-[60vh] md:min-h-screen flex flex-col justify-center items-start px-4 sm:px-8 md:px-16 pt-20 pb-12 md:py-0 relative bg-black-first z-10"
       >
         <h1
           ref={titleRef}
-          className="text-[2.5rem] sm:text-4xl md:text-5xl lg:text-7xl font-hero font-bold mb-4"
+          className="text-[2rem] sm:text-3xl md:text-4xl lg:text-5xl font-hero font-normal mb-4"
           style={{
             perspective: "1000px",
             transformStyle: "preserve-3d",
@@ -236,7 +236,7 @@ export default function AnimatedHero() {
 
         <p
           ref={descRef}
-          className="text-sm sm:text-base md:text-lg lg:text-xl text-white mb-6 md:mb-8 text-left font-sans max-w-xl opacity-0"
+          className="text-xs sm:text-sm md:text-base lg:text-lg text-white mb-6 md:mb-8 text-left font-normal max-w-xl opacity-0"
         >
           Any Stablecoin. Anywhere. Gasless.
         </p>
@@ -244,7 +244,7 @@ export default function AnimatedHero() {
         <Link
           href="/app"
           ref={buttonRef}
-          className="relative px-6 sm:px-8 py-3 sm:py-4 border-2 border-primary text-white font-hero font-bold text-sm sm:text-base md:text-lg overflow-hidden group inline-block"
+          className="relative px-6 sm:px-8 py-3 sm:py-4 border-2 border-primary text-white font-hero font-normal text-xs sm:text-sm md:text-base overflow-hidden group inline-block"
           style={{
             background: "transparent",
             transition: "all 0.3s ease",
