@@ -223,7 +223,7 @@ export default function AnimatedHero() {
       >
         <h1
           ref={titleRef}
-          className="text-[2rem] sm:text-3xl md:text-4xl lg:text-5xl font-hero font-normal mb-4"
+          className="text-[2rem] sm:text-3xl md:text-4xl lg:text-5xl font-hero font-thin mb-4"
           style={{
             perspective: "1000px",
             transformStyle: "preserve-3d",
@@ -236,7 +236,7 @@ export default function AnimatedHero() {
 
         <p
           ref={descRef}
-          className="text-xs sm:text-sm md:text-base lg:text-lg text-white mb-6 md:mb-8 text-left font-normal max-w-xl opacity-0"
+          className="text-xs sm:text-sm md:text-base lg:text-lg text-white mb-6 md:mb-8 text-left font-thin max-w-xl opacity-0"
         >
           Any Stablecoin. Anywhere. Gasless.
         </p>
@@ -244,7 +244,7 @@ export default function AnimatedHero() {
         <Link
           href="/app"
           ref={buttonRef}
-          className="relative px-6 sm:px-8 py-3 sm:py-4 border-2 border-primary text-white font-hero font-normal text-xs sm:text-sm md:text-base overflow-hidden group inline-block"
+          className="relative px-6 sm:px-8 py-3 sm:py-4 border-2 border-primary text-white font-hero font-thin text-xs sm:text-sm md:text-base overflow-hidden group inline-block"
           style={{
             background: "transparent",
             transition: "all 0.3s ease",

@@ -54,7 +54,7 @@ export default function HowItWorksCardItem({
     }, []);
 
     return (
-        <div className={`flex flex-col lg:flex-row w-full h-fit rounded-[2rem] sm:rounded-4xl overflow-hidden border border-white/10 ${isReversed ? "lg:flex-row-reverse" : ""}`}>
+        <div className={`flex flex-col lg:flex-row w-full h-fit lg:min-h-[600px] rounded-[2rem] sm:rounded-4xl overflow-hidden border border-white/10 ${isReversed ? "lg:flex-row-reverse" : ""}`}>
             {/* Image Section */}
             <div
                 className="relative bg-black-third flex items-center justify-center overflow-hidden w-full lg:w-1/2 aspect-square lg:aspect-auto"
@@ -76,9 +76,9 @@ export default function HowItWorksCardItem({
                                 <Image
                                     src={img}
                                     alt={`${title} ${idx + 1}`}
-                                    width={500}
-                                    height={500}
-                                    className="w-full h-full object-contain p-3 sm:p-4 lg:p-6"
+                                    width={600}
+                                    height={600}
+                                    className="w-full h-full object-contain p-4 sm:p-6 lg:p-8"
                                 />
                             </div>
                         ))}
@@ -129,13 +129,13 @@ export default function HowItWorksCardItem({
             </div>
 
             {/* Content Section */}
-            <div className="bg-black-second flex flex-col w-full lg:w-1/2 h-auto px-6 sm:px-12 lg:px-20 py-10 lg:py-16 justify-center gap-6 text-white text-center lg:text-left transition-all duration-300">
-                <div className="flex flex-col gap-4">
-                    <span className="text-base sm:text-2xl lg:text-3xl font-normal">{title}</span>
-                    <span className="text-xs sm:text-base lg:text-lg text-white/60 leading-relaxed font-normal">{description}</span>
+            <div className="bg-black-second flex flex-col w-full lg:w-1/2 h-auto px-6 sm:px-12 lg:px-20 py-10 lg:py-16 justify-center gap-6 text-white text-left transition-all duration-300">
+                <div className="flex flex-col gap-4 items-start">
+                    <span className="text-base sm:text-2xl lg:text-3xl font-thin">{title}</span>
+                    <span className="text-xs sm:text-base lg:text-lg text-white/60 leading-relaxed font-thin">{description}</span>
 
                     {steps && steps.length > 0 && (
-                        <ol className="list-decimal list-inside text-xs sm:text-base lg:text-lg text-white/60 space-y-2 ml-1 mt-4 text-left mx-auto lg:mx-0 max-w-md font-normal">
+                        <ol className="list-decimal list-inside text-xs sm:text-base lg:text-lg text-white/60 space-y-2 ml-1 mt-4 text-left lg:mx-0 max-w-md font-thin">
                             {steps.map((step, idx) => (
                                 <li key={idx} className="pl-1">{step}</li>
                             ))}

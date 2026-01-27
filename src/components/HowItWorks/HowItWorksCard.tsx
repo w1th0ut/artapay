@@ -45,7 +45,6 @@ export default function HowItWorksCard() {
             {howItWorks.map((item, index) => (
                 <HowItWorksCardItem
                     key={index}
-                    image={'image' in item ? item.image : undefined}
                     images={'images' in item ? item.images : undefined}
                     title={item.title}
                     description={item.description}

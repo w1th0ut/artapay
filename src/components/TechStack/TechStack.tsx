@@ -70,7 +70,7 @@ export default function TechStack() {
             className="w-full min-h-screen bg-black-first flex flex-col items-center justify-center px-4 py-8 md:py-16"
             style={{ scrollSnapAlign: 'start', scrollSnapStop: 'always' }}
         >
-            <h1 className="text-xl md:text-3xl lg:text-4xl font-normal mb-8 md:mb-16 text-center tracking-wider font-hero text-primary">
+            <h1 className="text-xl md:text-3xl lg:text-4xl font-thin mb-8 md:mb-16 text-center tracking-wider font-hero text-primary">
                 Integrated With
             </h1>
 
@@ -116,7 +116,7 @@ export default function TechStack() {
                             {/* Label that appears on hover */}
                             <motion.span
                                 variants={textVariants}
-                                className="relative z-10 font-hero text-black text-xs md:text-base lg:text-lg font-normal mt-1 md:mt-2 whitespace-nowrap"
+                                className="relative z-10 font-hero text-black text-xs md:text-base lg:text-lg font-thin mt-1 md:mt-2 whitespace-nowrap"
                             >
                                 {tech.name}
                             </motion.span>

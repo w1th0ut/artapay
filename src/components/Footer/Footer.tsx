@@ -42,7 +42,7 @@ export default function Footer() {
                     {footerSections.map((section) => (
                         <div key={section.title} className="flex flex-col gap-4">
                             <h3
-                                className="font-hero text-xl md:text-2xl text-black font-bold tracking-wide"
+                                className="font-hero text-xl md:text-2xl text-black font-thin tracking-wide"
                                 style={{ fontVariant: 'small-caps' }}
                             >
                                 {section.title}
@@ -69,7 +69,7 @@ export default function Footer() {
                 </div>
             </div>
             <div className='w-full '>
-                <TextHoverEffect text="ARTAPAY"/>
+                <TextHoverEffect text="ARTAPAY" />
             </div>
         </footer>
     );

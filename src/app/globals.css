@@ -197,9 +197,10 @@ body.privy-dialog-open {
 
   body {
     @apply bg-background text-foreground;
+    font-weight: 100;
   }
 
   .font-hero {
-    font-weight: 600;
+    font-weight: 100;
   }
 }

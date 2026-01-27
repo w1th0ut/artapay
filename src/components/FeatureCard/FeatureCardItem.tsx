@@ -96,10 +96,10 @@ export default function FeatureCardItem({
                 ref={bottomSectionRef}
                 className="px-6 py-8 sm:px-8 sm:py-10 lg:px-10 lg:py-10 w-full flex flex-col gap-2 sm:gap-3 text-white transition-colors duration-300 z-20"
             >
-                <div className="text-base sm:text-2xl lg:text-3xl font-normal">
+                <div className="text-base sm:text-2xl lg:text-3xl font-thin">
                     {title}
                 </div>
-                <div className="text-xs sm:text-base lg:text-lg text-white/60 leading-relaxed font-normal">
+                <div className="text-xs sm:text-base lg:text-lg text-white/60 leading-relaxed font-thin">
                     {description}
                 </div>
             </div>
