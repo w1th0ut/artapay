@@ -2,13 +2,18 @@
 
 import HowItWorksCardItem from "./HowItWorksCardItem";
 
-import SendFeature from '@/assets/Send_Feature_Scan.png';
-import ReceiveFeature from '@/assets/Receive_Feature.png';
-import SwapFeature from '@/assets/Swap_Feature.png';
+import SendFeature1 from '@/assets/send-1.png';
+import SendFeature2 from '@/assets/send-2.png';
+import SendFeature3 from '@/assets/send-3.png';
+import SendFeature4 from '@/assets/send-4.png';
+import ReceiveFeature from '@/assets/receive-1.png';
+import ReceiveFeature2 from '@/assets/receive-2.png';
+import SwapFeature from '@/assets/swap.png';
+import TopUpFeature from '@/assets/top-up.png';
 
 const howItWorks = [
     {
-        image: SendFeature.src,
+        images: [SendFeature1.src, SendFeature2.src, SendFeature3.src, SendFeature4.src],
         title: "Send",
         description: "Send token to anyone with any token instantly through your lens.",
         steps: [
@@ -18,13 +23,18 @@ const howItWorks = [
         ]
     },
     {
-        image: ReceiveFeature.src,
+        images: [ReceiveFeature.src, ReceiveFeature2.src],
         title: "Receive",
         description: "Set the amount and generate QR Code to receive token from anyone with any token.",
     },
     {
-        image: SwapFeature.src,
+        images: [SwapFeature.src],
         title: "Swap",
+        description: "Set the amount and choose which stablecoin currency you want to convert your token into.",
+    },
+    {
+        images: [TopUpFeature.src],
+        title: "Top Up",
         description: "Set the amount and choose which stablecoin currency you want to convert your token into.",
     }
 ];
@@ -35,7 +45,8 @@ export default function HowItWorksCard() {
             {howItWorks.map((item, index) => (
                 <HowItWorksCardItem
                     key={index}
-                    image={item.image}
+                    image={'image' in item ? item.image : undefined}
+                    images={'images' in item ? item.images : undefined}
                     title={item.title}
                     description={item.description}
                     steps={item.steps}
