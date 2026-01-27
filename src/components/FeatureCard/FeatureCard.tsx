@@ -41,7 +41,7 @@ const features = [
 
 export default function FeatureCard() {
     return (
-        <div className="flex flex-col gap-8 sm:gap-16 w-full">
+        <div className="flex flex-col gap-16 w-full">
             {features.map((feature, index) => (
                 <FeatureCardItem
                     key={index}
