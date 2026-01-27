@@ -111,13 +111,17 @@ export default function Home() {
       {/* Hero Section */}
       <AnimatedHero />
 
-      {/* FeatureCards */}
-      <FeatureCardMenu />
+      <div className="py-16 md:py-32">
+        <FeatureCardMenu />
+      </div>
 
-      {/* How It Works Section */}
-      <HowItWorksSection />
+      <div className="py-16 md:py-32">
+        <HowItWorksSection />
+      </div>
 
-      <TechStack />
+      <div className="py-16 md:py-32">
+        <TechStack />
+      </div>
 
       {/* Footer Section */}
       <div

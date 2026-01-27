@@ -42,7 +42,7 @@ export default function Footer() {
                     {footerSections.map((section) => (
                         <div key={section.title} className="flex flex-col gap-4">
                             <h3
-                                className="font-hero text-xl md:text-2xl text-black font-thin tracking-wide"
+                                className="font-hero text-xl md:text-2xl text-black font-semibold tracking-wide"
                                 style={{ fontVariant: 'small-caps' }}
                             >
                                 {section.title}
@@ -54,7 +54,7 @@ export default function Footer() {
                                             href={link.href}
                                             target={link.external ? '_blank' : undefined}
                                             rel={link.external ? 'noopener noreferrer' : undefined}
-                                            className="font-sans text-sm md:text-base text-black hover:text-white transition-opacity inline-flex items-center gap-1"
+                                            className="font-sans text-sm md:text-base text-black hover:text-white transition-opacity inline-flex items-center gap-1 font-normal"
                                         >
                                             {link.label}
                                             {link.external && (

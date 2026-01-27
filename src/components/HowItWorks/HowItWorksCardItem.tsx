@@ -129,7 +129,7 @@ export default function HowItWorksCardItem({
             </div>
 
             {/* Content Section */}
-            <div className="bg-black-second flex flex-col w-full lg:w-1/2 h-auto px-6 sm:px-12 lg:px-20 py-10 lg:py-16 justify-center gap-6 text-white text-left transition-all duration-300">
+            <div className="bg-black-second flex flex-col w-full lg:w-1/2 h-auto px-8 sm:px-12 lg:px-20 py-10 lg:py-16 justify-center gap-6 text-white text-left transition-all duration-300">
                 <div className="flex flex-col gap-4 items-start">
                     <span className="text-base sm:text-2xl lg:text-3xl font-thin">{title}</span>
                     <span className="text-xs sm:text-base lg:text-lg text-white/60 leading-relaxed font-thin">{description}</span>

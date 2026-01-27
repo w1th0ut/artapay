@@ -223,7 +223,7 @@ export default function AnimatedHero() {
       >
         <h1
           ref={titleRef}
-          className="text-[2rem] sm:text-3xl md:text-4xl lg:text-5xl font-hero font-thin mb-4"
+          className="text-[2rem] sm:text-4xl md:text-5xl lg:text-6xl font-hero font-medium mb-4"
           style={{
             perspective: "1000px",
             transformStyle: "preserve-3d",
@@ -269,7 +269,7 @@ export default function AnimatedHero() {
             className="btn-bg absolute inset-0 bg-primary origin-left"
             style={{ transform: "scaleX(0)" }}
           />
-          <span className="relative z-10 group-hover:text-black transition-colors duration-300">
+          <span className="relative z-10 group-hover:text-black transition-colors duration-300 font-medium">
             Get Started
           </span>
         </Link>

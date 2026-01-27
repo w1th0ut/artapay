@@ -55,19 +55,21 @@ const iconVariants = {
 };
 
 const textVariants = {
-    initial: { opacity: 0, y: 10 },
-    animate: { opacity: 0, y: 10 },
+    initial: { opacity: 0.5, color: '#ffffff', fontWeight: 100, y: 0 },
+    animate: { opacity: 0.5, color: '#ffffff', fontWeight: 100, y: 0 },
     hover: {
         opacity: 1,
+        color: '#000000',
+        fontWeight: 400,
         y: 0,
-        transition: { duration: 0.3, delay: 0.1 }
+        transition: { duration: 0.3 }
     }
 };
 
 export default function TechStack() {
     return (
         <section
-            className="w-full min-h-screen bg-black-first flex flex-col items-center justify-center px-4 py-8 md:py-16"
+            className="w-full bg-black-first flex flex-col items-center justify-center px-4 py-0"
             style={{ scrollSnapAlign: 'start', scrollSnapStop: 'always' }}
         >
             <h1 className="text-xl md:text-3xl lg:text-4xl font-thin mb-8 md:mb-16 text-center tracking-wider font-hero text-primary">
@@ -116,7 +118,7 @@ export default function TechStack() {
                             {/* Label that appears on hover */}
                             <motion.span
                                 variants={textVariants}
-                                className="relative z-10 font-hero text-black text-xs md:text-base lg:text-lg font-thin mt-1 md:mt-2 whitespace-nowrap"
+                                className="relative z-10 font-hero text-xs md:text-base lg:text-lg mt-1 md:mt-2 whitespace-nowrap"
                             >
                                 {tech.name}
                             </motion.span>
