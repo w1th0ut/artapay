@@ -11,6 +11,7 @@ import { AnimatedHero } from '@/components/Hero';
 import { sdk } from '@farcaster/miniapp-sdk';
 import { FeatureCardMenu } from '@/components/FeatureCard';
 import { HowItWorksSection } from '@/components/HowItWorks';
+import { SupportedCoinsMarquee } from '@/components/Marquee/Marquee';
 
 // Register ScrollTrigger plugin
 if (typeof window !== "undefined") {
@@ -118,6 +119,9 @@ export default function Home() {
       <div className="py-16 md:py-32">
         <HowItWorksSection />
       </div>
+
+      {/* Supported Coins Marquee Section */}
+      <SupportedCoinsMarquee />
 
       <div className="py-16 md:py-32">
         <TechStack />

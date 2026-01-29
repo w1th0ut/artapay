@@ -132,10 +132,10 @@ export default function HowItWorksCardItem({
             <div className="bg-black-second flex flex-col w-full lg:w-1/2 h-auto px-8 sm:px-12 lg:px-20 py-10 lg:py-16 justify-center gap-6 text-white text-left transition-all duration-300">
                 <div className="flex flex-col gap-4 items-start">
                     <span className="text-base sm:text-2xl lg:text-3xl font-thin">{title}</span>
-                    <span className="text-xs sm:text-base lg:text-lg text-white/60 leading-relaxed font-thin">{description}</span>
+                    <span className="text-xs sm:text-base lg:text-lg text-white/80 leading-relaxed font-thin">{description}</span>
 
                     {steps && steps.length > 0 && (
-                        <ol className="list-decimal list-inside text-xs sm:text-base lg:text-lg text-white/60 space-y-2 ml-1 mt-4 text-left lg:mx-0 max-w-md font-thin">
+                        <ol className="list-decimal list-inside text-xs sm:text-base lg:text-lg text-white/80 space-y-2 ml-1 mt-4 text-left lg:mx-0 max-w-md font-thin">
                             {steps.map((step, idx) => (
                                 <li key={idx} className="pl-1">{step}</li>
                             ))}

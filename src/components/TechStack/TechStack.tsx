@@ -10,7 +10,7 @@ interface TechItem {
 
 const techStack: TechItem[] = [
     { name: 'Foundry', icon: '/icons/Foundry.svg' },
-    { name: 'Gelato', icon: '/icons/Gelato.svg' },
+    { name: 'Pimlico', icon: '/icons/pimlico.svg' },
     { name: 'Base', icon: '/icons/Base.svg' },
     { name: 'Wagmi', icon: '/icons/Wagmi.svg' },
     { name: 'Viem', icon: '/icons/Viem.svg' },
@@ -72,7 +72,7 @@ export default function TechStack() {
             className="w-full bg-black-first flex flex-col items-center justify-center px-4 py-0"
             style={{ scrollSnapAlign: 'start', scrollSnapStop: 'always' }}
         >
-            <h1 className="text-xl md:text-3xl lg:text-4xl font-thin mb-8 md:mb-16 text-center tracking-wider font-hero text-primary">
+            <h1 className="text-xl md:text-3xl lg:text-4xl font-thin mb-8 md:mb-16 text-center tracking-wider font-hero text-white">
                 Integrated With
             </h1>
 

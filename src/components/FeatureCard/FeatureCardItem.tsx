@@ -40,15 +40,35 @@ export default function FeatureCardItem({
                 .to(hoverImageContainerRef.current, { x: 0 }, 0)
                 .to(bottomSectionRef.current, { backgroundColor: "#252525", duration: 0.3 }, 0);
 
-            ScrollTrigger.create({
-                trigger: cardRef.current,
-                start: "top 40%", // Aktif saat bagian atas kartu mencapai 70% layar dari atas
-                end: "bottom 60%", // Nonaktif saat bagian bawah kartu mencapai 30% layar dari atas
-                onEnter: () => tl.play(),
-                onLeave: () => tl.reverse(),
-                onEnterBack: () => tl.play(),
-                onLeaveBack: () => tl.reverse(),
-                // scrub: true, // Opsional: jika ingin animasi mengikuti scroll secara halus
+            // Responsive ScrollTrigger dengan matchMedia
+            const mm = gsap.matchMedia();
+
+            // Desktop (landscape) - viewport lebih lebar
+            mm.add("(min-width: 768px)", () => {
+                ScrollTrigger.create({
+                    trigger: cardRef.current,
+                    start: "top 60%", // Trigger lebih dalam untuk desktop
+                    end: "bottom 40%", // End point lebih tinggi
+                    onEnter: () => tl.play(),
+                    onLeave: () => tl.reverse(),
+                    onEnterBack: () => tl.play(),
+                    onLeaveBack: () => tl.reverse(),
+                    // markers: true, // Uncomment untuk debugging
+                });
+            });
+
+            // Mobile (portrait) - viewport lebih sempit dan tinggi
+            mm.add("(max-width: 767px)", () => {
+                ScrollTrigger.create({
+                    trigger: cardRef.current,
+                    start: "top 40%", // Trigger lebih lambat untuk mobile
+                    end: "bottom 40%", // End point lebih rendah
+                    onEnter: () => tl.play(),
+                    onLeave: () => tl.reverse(),
+                    onEnterBack: () => tl.play(),
+                    onLeaveBack: () => tl.reverse(),
+                    // markers: true, // Uncomment untuk debugging
+                });
             });
         }, cardRef);
 
@@ -99,7 +119,7 @@ export default function FeatureCardItem({
                 <div className="text-base sm:text-2xl lg:text-3xl font-thin">
                     {title}
                 </div>
-                <div className="text-xs sm:text-base lg:text-lg text-white/60 leading-relaxed font-thin">
+                <div className="text-xs sm:text-base lg:text-lg text-white/80 leading-relaxed font-thin">
                     {description}
                 </div>
             </div>
