@@ -259,8 +259,9 @@ export default function TopUpIDRX() {
               </div>
             </div>
             <ChevronDown
-              className={`text-zinc-400 transition-transform ${isTokenMenuOpen ? "rotate-180" : ""
-                }`}
+              className={`text-zinc-400 transition-transform ${
+                isTokenMenuOpen ? "rotate-180" : ""
+              }`}
               size={20}
             />
           </button>
@@ -274,8 +275,9 @@ export default function TopUpIDRX() {
                     setTopUpToken(token);
                     setIsTokenMenuOpen(false);
                   }}
-                  className={`w-full flex items-center gap-3 p-4 hover:bg-zinc-700 transition-colors cursor-pointer ${topUpToken.id === token.id ? "bg-zinc-700" : ""
-                    }`}
+                  className={`w-full flex items-center gap-3 p-4 hover:bg-zinc-700 transition-colors cursor-pointer ${
+                    topUpToken.id === token.id ? "bg-zinc-700" : ""
+                  }`}
                 >
                   <div className="w-10 h-10 rounded-full bg-zinc-600 flex items-center justify-center overflow-hidden">
                     <Image
@@ -333,6 +335,24 @@ export default function TopUpIDRX() {
         </div>
       </div>
 
+      <div className="p-4 bg-amber-950/30 border border-amber-800/50 rounded-xl space-y-2">
+        <div className="flex items-start gap-3">
+          <div className="shrink-0 w-5 h-5 rounded-full bg-amber-500/20 flex items-center justify-center mt-0.5">
+            <span className="text-amber-500 text-xs font-bold">⚠</span>
+          </div>
+          <div className="space-y-1 flex-1">
+            <p className="text-amber-400 font-semibold text-sm">
+              Direct IDRX API Integration
+            </p>
+            <p className="text-amber-200/80 text-xs leading-relaxed">
+              This top-up connects directly to the official IDRX API. You are
+              purchasing mainnet coin with actual monetary value.
+              Please transact carefully.
+            </p>
+          </div>
+        </div>
+      </div>
+
       {paymentUrl && (
         <div className="p-4 bg-zinc-800/60 border border-zinc-700 rounded-xl space-y-2">
           <div className="text-sm text-zinc-200">Payment link created</div>
@@ -342,7 +362,9 @@ export default function TopUpIDRX() {
             </div>
           )}
           <button
-            onClick={() => window.open(paymentUrl, "_blank", "noopener,noreferrer")}
+            onClick={() =>
+              window.open(paymentUrl, "_blank", "noopener,noreferrer")
+            }
             className="inline-flex items-center gap-2 text-primary text-sm hover:text-primary/80"
           >
             Open payment page <ExternalLink className="w-4 h-4" />
@@ -353,7 +375,10 @@ export default function TopUpIDRX() {
       <button
         onClick={handleCreatePayment}
         disabled={
-          !smartAccountAddress || isSubmitting || !hasValidAmount || isOutOfRange
+          !smartAccountAddress ||
+          isSubmitting ||
+          !hasValidAmount ||
+          isOutOfRange
         }
         className="w-full py-3 sm:py-4 bg-primary text-black font-bold text-base sm:text-lg md:text-xl rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
       >
@@ -391,8 +416,8 @@ export default function TopUpIDRX() {
                 const amountValue = Number(item.toBeMinted || 0);
                 const amountLabel = Number.isFinite(amountValue)
                   ? amountValue.toLocaleString(undefined, {
-                    maximumFractionDigits: 2,
-                  })
+                      maximumFractionDigits: 2,
+                    })
                   : item.toBeMinted;
                 const rawToken = (item.requestType || "idrx").toLowerCase();
                 const recordToken =
