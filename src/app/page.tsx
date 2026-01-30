@@ -91,7 +91,7 @@ export default function Home() {
   }, []);
 
   return (
-    <div className='min-h-screen bg-black-first'>
+    <div className='min-h-screen bg-black-first overflow-x-hidden'>
       <StaggeredMenu
         isFixed={true}
         position="right"
