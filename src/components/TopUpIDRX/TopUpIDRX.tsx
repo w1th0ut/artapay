@@ -66,6 +66,8 @@ export default function TopUpIDRX() {
   const [isLoadingHistory, setIsLoadingHistory] = useState(false);
   const [historyPage, setHistoryPage] = useState(1);
   const [historyPageCount, setHistoryPageCount] = useState(0);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [isConfirmChecked, setIsConfirmChecked] = useState(false);
 
   const [errorModal, setErrorModal] = useState<{
     isOpen: boolean;
@@ -103,6 +105,16 @@ export default function TopUpIDRX() {
     setPaymentUrl(null);
     setReference(null);
   }, [topUpToken]);
+
+  const openConfirmModal = () => {
+    setIsConfirmChecked(false);
+    setIsConfirmOpen(true);
+  };
+
+  const closeConfirmModal = () => {
+    setIsConfirmOpen(false);
+    setIsConfirmChecked(false);
+  };
 
   const loadHistory = useCallback(
     async (page: number = 1) => {
@@ -373,7 +385,7 @@ export default function TopUpIDRX() {
       )}
 
       <button
-        onClick={handleCreatePayment}
+        onClick={openConfirmModal}
         disabled={
           !smartAccountAddress ||
           isSubmitting ||
@@ -384,6 +396,61 @@ export default function TopUpIDRX() {
       >
         {isSubmitting ? "CREATING LINK..." : "TOP UP IDRX"}
       </button>
+
+      <Modal
+        id="idrx-topup-confirm-modal"
+        role="dialog"
+        aria-modal={true}
+        aria-labelledby="confirm-title"
+        aria-describedby="confirm-desc"
+        tabIndex={-1}
+        isOpen={isConfirmOpen}
+        onClose={closeConfirmModal}
+        title="Confirm Top Up"
+      >
+        <div className="space-y-4">
+          <p className="text-zinc-400 text-sm text-center">
+            Please review and accept the notice below before continuing.
+          </p>
+          <div
+            id="confirm-desc"
+            className="rounded-lg border border-zinc-700 bg-zinc-900/70 p-3 text-xs text-zinc-300 leading-relaxed"
+          >
+            By proceeding, you acknowledge that this will send IDRX/USDC mainnet
+            funds to your Smart Account. Currently ArtaPay only support Testnet.
+            The ArtaPay Team is not responsible for any loss.
+          </div>
+          <label className="flex items-start gap-3 text-sm text-zinc-200">
+            <input
+              type="checkbox"
+              checked={isConfirmChecked}
+              onChange={(e) => setIsConfirmChecked(e.target.checked)}
+              className="mt-0.5 h-4 w-4 rounded border-zinc-600 bg-zinc-900 text-primary focus:ring-primary"
+            />
+            <span>I understand and accept this notice.</span>
+          </label>
+          <div className="flex gap-3">
+            <button
+              type="button"
+              onClick={closeConfirmModal}
+              className="w-full py-3 border-2 border-zinc-600 text-zinc-200 font-bold text-sm sm:text-base rounded-xl hover:bg-zinc-700/40 transition-colors cursor-pointer"
+            >
+              Cancel
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                closeConfirmModal();
+                handleCreatePayment();
+              }}
+              disabled={!isConfirmChecked || isSubmitting}
+              className="w-full py-3 bg-primary text-black font-bold text-sm sm:text-base rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              Confirm Top Up
+            </button>
+          </div>
+        </div>
+      </Modal>
 
       <div className="border-t border-zinc-800 pt-4 space-y-3">
         <div className="flex items-center justify-between">
