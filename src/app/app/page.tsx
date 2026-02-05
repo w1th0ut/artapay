@@ -9,6 +9,7 @@ import {
   SwapContent,
   TopUpContent,
   ActivityContent,
+  ProfileContent,
 } from "@/components/Menu";
 import {
   WalletButton,
@@ -26,6 +27,7 @@ const contentComponents = {
   swap: SwapContent,
   topup: TopUpContent,
   activity: ActivityContent,
+  profile: ProfileContent,
 };
 const STORAGE_KEY = "artapay_active_menu";
 
@@ -47,7 +49,7 @@ export default function Start() {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (
       saved &&
-      ["send", "receive", "swap", "topup", "activity"].includes(saved)
+      ["send", "receive", "swap", "topup", "activity", "profile"].includes(saved)
     ) {
       setActiveMenu(saved as MenuType);
     }

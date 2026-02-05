@@ -29,12 +29,14 @@ import {
   PIMLICO_BUNDLER_URL,
   PAYMASTER_ADDRESS,
   PAYMENT_PROCESSOR_ADDRESS,
+  QRIS_REGISTRY_ADDRESS,
   SIMPLE_ACCOUNT_FACTORY,
 } from "@/config/constants";
 import {
   ERC20_ABI,
   FAUCET_ABI,
   PAYMENT_PROCESSOR_ABI,
+  QRIS_REGISTRY_ABI,
   STABLE_SWAP_ABI,
   PAYMASTER_ABI,
 } from "@/config/abi";
@@ -976,6 +978,108 @@ export function useSmartAccount() {
         }
         setStatus("Faucet executed on-chain");
         return { txHash: receipt.txHash || userOpHash, sender: address };
+      } catch (err) {
+        const message = transformError(err);
+        setError(message);
+        setStatus(message);
+        throw new Error(message);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [ensureClient, getFeeParams, waitForUserOp, assertPaymasterBalance],
+  );
+
+  const registerQris = useCallback(
+    async (params: {
+      qrisHash: `0x${string}`;
+      merchantName: string;
+      merchantId: string;
+      merchantCity: string;
+      feeToken: Address;
+      feeTokenDecimals: number;
+    }) => {
+      setError(null);
+      setIsLoading(true);
+      try {
+        const { client, address } = await ensureClient();
+        const feeParams = await getFeeParams();
+
+        const gasLimitEstimate =
+          260_000n +
+          PAYMASTER_VERIFICATION_GAS +
+          PAYMASTER_POST_OP_GAS +
+          PRE_VERIFICATION_GAS;
+
+        await assertPaymasterBalance({
+          token: params.feeToken,
+          owner: address,
+          spendAmount: 0n,
+          decimals: params.feeTokenDecimals,
+          gasLimit: gasLimitEstimate,
+          maxFeePerGas: feeParams.maxFeePerGas,
+        });
+
+        setStatus("Requesting paymaster signature for QRIS...");
+        const validUntil = Math.floor(Date.now() / 1000) + 3600;
+        const validAfter = 0;
+        const signature = await getPaymasterSignature({
+          payerAddress: address,
+          tokenAddress: params.feeToken,
+          validUntil,
+          validAfter,
+          isActivation: false,
+        });
+
+        const paymasterData = buildPaymasterData({
+          tokenAddress: params.feeToken,
+          payerAddress: address,
+          validUntil,
+          validAfter,
+          hasPermit: false,
+          isActivation: false,
+          signature: signature as `0x${string}`,
+        });
+
+        const registerData = encodeFunctionData({
+          abi: QRIS_REGISTRY_ABI,
+          functionName: "registerQris",
+          args: [
+            params.qrisHash,
+            params.merchantName,
+            params.merchantId,
+            params.merchantCity,
+          ],
+        });
+
+        setStatus("Submitting QRIS registration...");
+        const res = await client.sendCalls({
+          calls: [
+            {
+              to: QRIS_REGISTRY_ADDRESS,
+              data: registerData,
+              value: BigInt(0),
+            },
+          ],
+          paymaster: PAYMASTER_ADDRESS,
+          paymasterData,
+          paymasterVerificationGasLimit: PAYMASTER_VERIFICATION_GAS,
+          paymasterPostOpGasLimit: PAYMASTER_POST_OP_GAS,
+          callGasLimit: BigInt(260_000),
+          verificationGasLimit: BigInt(600_000),
+          preVerificationGas: PRE_VERIFICATION_GAS,
+          ...feeParams,
+        });
+
+        const userOpHash = res.id as `0x${string}`;
+        setStatus("QRIS submitted, waiting for execution...");
+        const receipt = await waitForUserOp(userOpHash);
+        if (!receipt.success) {
+          const reason = receipt.reason || "QRIS registration failed";
+          throw new Error(reason);
+        }
+        setStatus("QRIS registered on-chain");
+        return receipt.txHash || userOpHash;
       } catch (err) {
         const message = transformError(err);
         setError(message);
@@ -2025,6 +2129,7 @@ export function useSmartAccount() {
     sendBatchTransfer,
     approvePaymaster,
     claimFaucet,
+    registerQris,
     initSmartAccount: ensureClient,
     swapTokens,
     swapAndTransfer,

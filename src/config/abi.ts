@@ -300,3 +300,72 @@ export const STABLECOIN_REGISTRY_ABI = [
     ],
   },
 ] as const;
+
+export const QRIS_REGISTRY_ABI = [
+  {
+    type: "function",
+    name: "registerQris",
+    stateMutability: "nonpayable",
+    inputs: [
+      { name: "qrisHash", type: "bytes32" },
+      { name: "merchantName", type: "string" },
+      { name: "merchantId", type: "string" },
+      { name: "merchantCity", type: "string" },
+    ],
+    outputs: [],
+  },
+  {
+    type: "function",
+    name: "getQris",
+    stateMutability: "view",
+    inputs: [{ name: "qrisHash", type: "bytes32" }],
+    outputs: [
+      {
+        name: "info",
+        type: "tuple",
+        components: [
+          { name: "qrisHash", type: "bytes32" },
+          { name: "sa", type: "address" },
+          { name: "merchantName", type: "string" },
+          { name: "merchantId", type: "string" },
+          { name: "merchantCity", type: "string" },
+          { name: "active", type: "bool" },
+        ],
+      },
+    ],
+  },
+  {
+    type: "function",
+    name: "getQrisBySa",
+    stateMutability: "view",
+    inputs: [{ name: "sa", type: "address" }],
+    outputs: [
+      {
+        name: "info",
+        type: "tuple",
+        components: [
+          { name: "qrisHash", type: "bytes32" },
+          { name: "sa", type: "address" },
+          { name: "merchantName", type: "string" },
+          { name: "merchantId", type: "string" },
+          { name: "merchantCity", type: "string" },
+          { name: "active", type: "bool" },
+        ],
+      },
+    ],
+  },
+  {
+    type: "function",
+    name: "isWhitelisted",
+    stateMutability: "view",
+    inputs: [{ name: "sa", type: "address" }],
+    outputs: [{ type: "bool" }],
+  },
+  {
+    type: "function",
+    name: "isAdmin",
+    stateMutability: "view",
+    inputs: [{ name: "account", type: "address" }],
+    outputs: [{ type: "bool" }],
+  },
+] as const;

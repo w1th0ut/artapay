@@ -1,13 +1,17 @@
 "use client";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import ClosedCamera from "./ClosedCamera";
 import OpenCamera from "./OpenCamera";
 import ImportFromGallery from "./ImportFromGallery";
 import TransactionPopup from "./TransactionPopup";
-import { PAYMENT_PROCESSOR_ADDRESS } from "@/config/constants";
+import QrisPaymentPopup from "./QrisPaymentPopup";
+import { PAYMENT_PROCESSOR_ADDRESS, QRIS_REGISTRY_ADDRESS } from "@/config/constants";
 import { BASE_SEPOLIA } from "@/config/chains";
 import { ReceiptPopUp, ReceiptData } from "@/components/ReceiptPopUp";
 import Modal from "@/components/Modal";
+import { parseQrisPayload } from "@/lib/qris";
+import { QRIS_REGISTRY_ABI } from "@/config/abi";
+import { createPublicClient, http } from "viem";
 
 interface PaymentRequestPayload {
   version: string;
@@ -24,15 +28,34 @@ interface PaymentRequestPayload {
   signature: string;
 }
 
+interface QrisRegistryInfo {
+  qrisHash: string;
+  sa: string;
+  merchantName: string;
+  merchantId: string;
+  merchantCity: string;
+  active: boolean;
+}
+
 interface QRCodeProps {
   onScanResult?: (result: string) => void;
   disabled?: boolean;
 }
 
 export default function QRCode({ onScanResult, disabled }: QRCodeProps) {
+  const publicClient = useMemo(
+    () =>
+      createPublicClient({
+        chain: BASE_SEPOLIA,
+        transport: http(BASE_SEPOLIA.rpcUrls.default.http[0]),
+      }),
+    [],
+  );
+  const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [scannedPayload, setScannedPayload] =
     useState<PaymentRequestPayload | null>(null);
+  const [scannedQris, setScannedQris] = useState<QrisRegistryInfo | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<ReceiptData | null>(null);
   const [showReceipt, setShowReceipt] = useState(false);
@@ -56,56 +79,75 @@ export default function QRCode({ onScanResult, disabled }: QRCodeProps) {
     setIsCameraOpen(false);
   };
 
-  const processQRData = (result: string) => {
+  const processQRData = async (result: string) => {
+    setImportError(null);
+
     try {
       const data = JSON.parse(result);
+      if (data?.version === "artapay-payment-v2") {
+        if (
+          !data.request?.requestedToken ||
+          !data.request?.recipient ||
+          !data.signature
+        ) {
+          throw new Error("QR data incomplete");
+        }
 
-      // Validate ArtaPay payment request format
-      if (data.version !== "artapay-payment-v2") {
-        throw new Error("Invalid QR format - not an ArtaPay payment request");
+        if (data.chainId !== BASE_SEPOLIA.id) {
+          throw new Error(
+            `Wrong network. Expected Base Sepolia (${BASE_SEPOLIA.id})`,
+          );
+        }
+
+        if (
+          data.request.deadline &&
+          data.request.deadline < Math.floor(Date.now() / 1000)
+        ) {
+          throw new Error("Payment request has expired");
+        }
+
+        const payload: PaymentRequestPayload = {
+          version: data.version,
+          processor: data.processor || PAYMENT_PROCESSOR_ADDRESS,
+          chainId: data.chainId,
+          request: {
+            recipient: data.request.recipient,
+            requestedToken: data.request.requestedToken,
+            requestedAmountRaw: data.request.requestedAmountRaw,
+            deadline: data.request.deadline,
+            nonce: data.request.nonce,
+            merchantSigner: data.request.merchantSigner,
+          },
+          signature: data.signature,
+        };
+
+        setScannedPayload(payload);
+        setIsCameraOpen(false);
+        onScanResult?.(result);
+        return;
+      }
+    } catch {
+      // fallthrough to QRIS
+    }
+
+    try {
+      const parsed = parseQrisPayload(result);
+      const info = (await publicClient.readContract({
+        address: QRIS_REGISTRY_ADDRESS,
+        abi: QRIS_REGISTRY_ABI,
+        functionName: "getQris",
+        args: [parsed.hash],
+      })) as QrisRegistryInfo;
+
+      if (!info || !info.active || info.sa === ZERO_ADDRESS) {
+        throw new Error("QRIS not registered in ArtaPay");
       }
 
-      if (
-        !data.request?.requestedToken ||
-        !data.request?.recipient ||
-        !data.signature
-      ) {
-        throw new Error("QR data incomplete");
-      }
-
-      // Validate chain and processor
-      if (data.chainId !== BASE_SEPOLIA.id) {
-        throw new Error(
-          `Wrong network. Expected Base Sepolia (${BASE_SEPOLIA.id})`
-        );
-      }
-
-      // Check deadline
-      if (
-        data.request.deadline &&
-        data.request.deadline < Math.floor(Date.now() / 1000)
-      ) {
-        throw new Error("Payment request has expired");
-      }
-
-      const payload: PaymentRequestPayload = {
-        version: data.version,
-        processor: data.processor || PAYMENT_PROCESSOR_ADDRESS,
-        chainId: data.chainId,
-        request: {
-          recipient: data.request.recipient,
-          requestedToken: data.request.requestedToken,
-          requestedAmountRaw: data.request.requestedAmountRaw,
-          deadline: data.request.deadline,
-          nonce: data.request.nonce,
-          merchantSigner: data.request.merchantSigner,
-        },
-        signature: data.signature,
-      };
-
-      setScannedPayload(payload);
+      setScannedQris({
+        ...info,
+        qrisHash: parsed.hash,
+      });
       setIsCameraOpen(false);
-      setImportError(null);
       onScanResult?.(result);
     } catch (e) {
       console.error("Invalid QR data:", e);
@@ -119,11 +161,11 @@ export default function QRCode({ onScanResult, disabled }: QRCodeProps) {
   };
 
   const handleScan = (result: string) => {
-    processQRData(result);
+    void processQRData(result);
   };
 
   const handleImport = (result: string) => {
-    processQRData(result);
+    void processQRData(result);
   };
 
   const handleImportError = (error: string) => {
@@ -132,6 +174,7 @@ export default function QRCode({ onScanResult, disabled }: QRCodeProps) {
 
   const handleCancel = () => {
     setScannedPayload(null);
+    setScannedQris(null);
   };
 
   useEffect(() => {
@@ -140,10 +183,22 @@ export default function QRCode({ onScanResult, disabled }: QRCodeProps) {
     }
   }, [disabled, isCameraOpen]);
 
-  // Show transaction popup if data scanned
   if (scannedPayload) {
     return (
       <TransactionPopup payload={scannedPayload} onCancel={handleCancel} />
+    );
+  }
+
+  if (scannedQris) {
+    return (
+      <QrisPaymentPopup
+        recipient={scannedQris.sa}
+        merchantName={scannedQris.merchantName}
+        merchantId={scannedQris.merchantId}
+        merchantCity={scannedQris.merchantCity}
+        qrisHash={scannedQris.qrisHash}
+        onCancel={handleCancel}
+      />
     );
   }
 

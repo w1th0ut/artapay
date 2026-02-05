@@ -11,6 +11,7 @@ export const STABLE_SWAP_ADDRESS = env.stableSwapAddress as Address;
 export const PAYMENT_PROCESSOR_ADDRESS = env.paymentProcessorAddress as Address;
 export const STABLECOIN_REGISTRY_ADDRESS =
   env.stablecoinRegistryAddress as Address;
+export const QRIS_REGISTRY_ADDRESS = env.qrisRegistryAddress as Address;
 
 export const TOKENS: {
   symbol: string;

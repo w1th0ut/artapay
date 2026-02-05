@@ -75,6 +75,10 @@ export const env = {
     process.env.NEXT_PUBLIC_STABLECOIN_REGISTRY_ADDRESS,
     "NEXT_PUBLIC_STABLECOIN_REGISTRY_ADDRESS",
   ),
+  qrisRegistryAddress: requireEnv(
+    process.env.NEXT_PUBLIC_QRIS_REGISTRY_ADDRESS,
+    "NEXT_PUBLIC_QRIS_REGISTRY_ADDRESS",
+  ),
   signerApiUrl: requireEnv(
     process.env.NEXT_PUBLIC_SIGNER_API_URL,
     "NEXT_PUBLIC_SIGNER_API_URL",

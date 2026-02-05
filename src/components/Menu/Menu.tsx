@@ -6,11 +6,18 @@ import {
   ArrowDownLeft,
   RotateCw,
   Coins,
+  User,
   LucideIcon,
 } from "lucide-react";
 import MenuItem from './MenuItem';
 
-export type MenuType = "send" | "receive" | "swap" | "topup" | "activity";
+export type MenuType =
+  | "send"
+  | "receive"
+  | "swap"
+  | "topup"
+  | "activity"
+  | "profile";
 interface MenuProps {
   activeMenu: MenuType;
   onMenuChange: (menu: MenuType) => void;
@@ -26,6 +33,7 @@ const menuItemsData: MenuItemData[] = [
   { id: "swap", label: "Swap", Icon: ArrowDownUp },
   { id: "topup", label: "Top Up", Icon: Coins },
   { id: "activity", label: "Activity", Icon: RotateCw },
+  { id: "profile", label: "Profile", Icon: User },
 ];
 export default function Menu({ activeMenu, onMenuChange }: MenuProps) {
   const handleMenuClick = useCallback(
@@ -49,7 +57,9 @@ export default function Menu({ activeMenu, onMenuChange }: MenuProps) {
   );
   return (
     <div className="w-full">
-      <div className="grid grid-cols-5 gap-2 sm:gap-4 mb-4">{menuItems}</div>
+      <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 sm:gap-4 mb-4">
+        {menuItems}
+      </div>
     </div>
   );
 }

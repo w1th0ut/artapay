@@ -9,6 +9,7 @@ ArtaPay Frontend provides:
 - **Send & Receive**: Single transfer, batch transfer, and multi-token payments
 - **ENS Support**: Send to Base mainnet ENS names (via mainnet RPC resolver)
 - **QR Payments**: Scan and generate payment requests
+- **QRIS Supported**: Pay to QRIS (Quick Response Code Indonesian Standard)
 - **Stablecoin Swaps**: Quote and execute swaps via StableSwap
 - **IDRX Top Up**: IDRX API integration for top-up flow
 - **Activity Views**: Recent transfers and payment receipts
@@ -96,6 +97,7 @@ NEXT_PUBLIC_PAYMASTER_ADDRESS=
 NEXT_PUBLIC_STABLE_SWAP_ADDRESS=
 NEXT_PUBLIC_PAYMENT_PROCESSOR_ADDRESS=
 NEXT_PUBLIC_STABLECOIN_REGISTRY_ADDRESS=
+NEXT_PUBLIC_QRIS_REGISTRY_ADDRESS=
 
 NEXT_PUBLIC_SIGNER_API_URL=http://localhost:3001
 NEXT_PUBLIC_PRIVY_APP_ID=
@@ -185,6 +187,7 @@ Paymaster:             0x1b14BF9ab47069a77c70Fb0ac02Bcb08A9Ffe290
 StableSwap:            0x822e1dfb7bf410249b2bE39809A5Ae0cbfae612f
 PaymentProcessor:      0x4D053b241a91c4d8Cd86D0815802F69D34a0164B
 SimpleAccountFactory:  0xfEA9DD0034044C330c0388756Fd643A5015d94D2
+QRISRegistry:          0x5268D80f943288bBe50fc20142e09EcC9B6b1F3e
 
 Mock Tokens:
   USDC:  0x74FB067E49CBd0f97Dc296919e388CB3CFB62b4D

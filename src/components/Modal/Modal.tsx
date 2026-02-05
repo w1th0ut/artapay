@@ -2,7 +2,7 @@
 
 import { useEffect, useCallback, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { AlertTriangle, X } from "lucide-react";
+import { AlertTriangle, CheckCircle, X } from "lucide-react";
 
 interface ModalProps {
     id?: string;
@@ -19,6 +19,7 @@ interface ModalProps {
     title?: string;
     message?: string;
     icon?: React.ReactNode;
+    variant?: "alert" | "success";
     children?: React.ReactNode;
 }
 
@@ -35,6 +36,7 @@ export default function Modal({
     title = "Error",
     message,
     icon,
+    variant = "alert",
     children,
 }: ModalProps) {
     const modalRef = useRef<HTMLDivElement>(null);
@@ -73,9 +75,17 @@ export default function Modal({
     };
 
     // Default icon if not provided
-    const displayIcon = icon ?? (
-        <AlertTriangle className="w-8 h-8 text-red-500" />
-    );
+    const isSuccess = variant === "success";
+    const displayIcon =
+        icon ??
+        (isSuccess ? (
+            <CheckCircle className="w-8 h-8 text-emerald-400" />
+        ) : (
+            <AlertTriangle className="w-8 h-8 text-red-500" />
+        ));
+    const iconWrapperClass = isSuccess
+        ? "bg-emerald-500/20"
+        : "bg-red-500/20";
 
     return (
         <AnimatePresence>
@@ -114,7 +124,9 @@ export default function Modal({
 
                         {/* Icon */}
                         <div className="flex flex-col items-center mb-4">
-                            <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center">
+                            <div
+                                className={`w-16 h-16 ${iconWrapperClass} rounded-full flex items-center justify-center`}
+                            >
                                 {displayIcon}
                             </div>
                         </div>
