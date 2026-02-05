@@ -245,11 +245,14 @@ export default function ProfileContent() {
           />
         ) : (
           <div className="space-y-3">
-            <ClosedCamera onScanNow={handleScanNow} disabled={isRegistered} />
+            <ClosedCamera
+              onScanNow={handleScanNow}
+              disabled={isRegistered || !isWhitelistReady}
+            />
             <p className="text-accent text-sm text-center">or</p>
             <ImportFromGallery
               onImport={handleParsed}
-              disabled={isRegistered}
+              disabled={isRegistered || !isWhitelistReady}
               onError={(err) =>
                 setErrorModal({
                   isOpen: true,
