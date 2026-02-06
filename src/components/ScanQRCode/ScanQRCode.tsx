@@ -31,6 +31,7 @@ interface PaymentRequestPayload {
 interface QrisRegistryInfo {
   qrisHash: string;
   sa: string;
+  qrisPayload: string;
   merchantName: string;
   merchantId: string;
   merchantCity: string;

@@ -308,6 +308,7 @@ export const QRIS_REGISTRY_ABI = [
     stateMutability: "nonpayable",
     inputs: [
       { name: "qrisHash", type: "bytes32" },
+      { name: "qrisPayload", type: "string" },
       { name: "merchantName", type: "string" },
       { name: "merchantId", type: "string" },
       { name: "merchantCity", type: "string" },
@@ -326,6 +327,7 @@ export const QRIS_REGISTRY_ABI = [
         components: [
           { name: "qrisHash", type: "bytes32" },
           { name: "sa", type: "address" },
+          { name: "qrisPayload", type: "string" },
           { name: "merchantName", type: "string" },
           { name: "merchantId", type: "string" },
           { name: "merchantCity", type: "string" },
@@ -346,6 +348,7 @@ export const QRIS_REGISTRY_ABI = [
         components: [
           { name: "qrisHash", type: "bytes32" },
           { name: "sa", type: "address" },
+          { name: "qrisPayload", type: "string" },
           { name: "merchantName", type: "string" },
           { name: "merchantId", type: "string" },
           { name: "merchantCity", type: "string" },
@@ -356,16 +359,9 @@ export const QRIS_REGISTRY_ABI = [
   },
   {
     type: "function",
-    name: "isWhitelisted",
-    stateMutability: "view",
-    inputs: [{ name: "sa", type: "address" }],
-    outputs: [{ type: "bool" }],
-  },
-  {
-    type: "function",
-    name: "isAdmin",
-    stateMutability: "view",
-    inputs: [{ name: "account", type: "address" }],
-    outputs: [{ type: "bool" }],
+    name: "removeMyQris",
+    stateMutability: "nonpayable",
+    inputs: [],
+    outputs: [],
   },
 ] as const;

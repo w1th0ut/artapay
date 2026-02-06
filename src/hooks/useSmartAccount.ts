@@ -993,6 +993,7 @@ export function useSmartAccount() {
   const registerQris = useCallback(
     async (params: {
       qrisHash: `0x${string}`;
+      qrisPayload: string;
       merchantName: string;
       merchantId: string;
       merchantCity: string;
@@ -1006,7 +1007,7 @@ export function useSmartAccount() {
         const feeParams = await getFeeParams();
 
         const gasLimitEstimate =
-          260_000n +
+          520_000n +
           PAYMASTER_VERIFICATION_GAS +
           PAYMASTER_POST_OP_GAS +
           PRE_VERIFICATION_GAS;
@@ -1046,6 +1047,7 @@ export function useSmartAccount() {
           functionName: "registerQris",
           args: [
             params.qrisHash,
+            params.qrisPayload,
             params.merchantName,
             params.merchantId,
             params.merchantCity,
@@ -1065,8 +1067,8 @@ export function useSmartAccount() {
           paymasterData,
           paymasterVerificationGasLimit: PAYMASTER_VERIFICATION_GAS,
           paymasterPostOpGasLimit: PAYMASTER_POST_OP_GAS,
-          callGasLimit: BigInt(260_000),
-          verificationGasLimit: BigInt(600_000),
+          callGasLimit: BigInt(520_000),
+          verificationGasLimit: BigInt(900_000),
           preVerificationGas: PRE_VERIFICATION_GAS,
           ...feeParams,
         });
@@ -1079,6 +1081,96 @@ export function useSmartAccount() {
           throw new Error(reason);
         }
         setStatus("QRIS registered on-chain");
+        return receipt.txHash || userOpHash;
+      } catch (err) {
+        const message = transformError(err);
+        setError(message);
+        setStatus(message);
+        throw new Error(message);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [ensureClient, getFeeParams, waitForUserOp, assertPaymasterBalance],
+  );
+
+  const removeMyQris = useCallback(
+    async (params: { feeToken: Address; feeTokenDecimals: number }) => {
+      setError(null);
+      setIsLoading(true);
+      try {
+        const { client, address } = await ensureClient();
+        const feeParams = await getFeeParams();
+
+        const gasLimitEstimate =
+          220_000n +
+          PAYMASTER_VERIFICATION_GAS +
+          PAYMASTER_POST_OP_GAS +
+          PRE_VERIFICATION_GAS;
+
+        await assertPaymasterBalance({
+          token: params.feeToken,
+          owner: address,
+          spendAmount: 0n,
+          decimals: params.feeTokenDecimals,
+          gasLimit: gasLimitEstimate,
+          maxFeePerGas: feeParams.maxFeePerGas,
+        });
+
+        setStatus("Requesting paymaster signature for QRIS removal...");
+        const validUntil = Math.floor(Date.now() / 1000) + 3600;
+        const validAfter = 0;
+        const signature = await getPaymasterSignature({
+          payerAddress: address,
+          tokenAddress: params.feeToken,
+          validUntil,
+          validAfter,
+          isActivation: false,
+        });
+
+        const paymasterData = buildPaymasterData({
+          tokenAddress: params.feeToken,
+          payerAddress: address,
+          validUntil,
+          validAfter,
+          hasPermit: false,
+          isActivation: false,
+          signature: signature as `0x${string}`,
+        });
+
+        const removeData = encodeFunctionData({
+          abi: QRIS_REGISTRY_ABI,
+          functionName: "removeMyQris",
+          args: [],
+        });
+
+        setStatus("Submitting QRIS removal...");
+        const res = await client.sendCalls({
+          calls: [
+            {
+              to: QRIS_REGISTRY_ADDRESS,
+              data: removeData,
+              value: BigInt(0),
+            },
+          ],
+          paymaster: PAYMASTER_ADDRESS,
+          paymasterData,
+          paymasterVerificationGasLimit: PAYMASTER_VERIFICATION_GAS,
+          paymasterPostOpGasLimit: PAYMASTER_POST_OP_GAS,
+          callGasLimit: BigInt(220_000),
+          verificationGasLimit: BigInt(500_000),
+          preVerificationGas: PRE_VERIFICATION_GAS,
+          ...feeParams,
+        });
+
+        const userOpHash = res.id as `0x${string}`;
+        setStatus("QRIS removal submitted, waiting for execution...");
+        const receipt = await waitForUserOp(userOpHash);
+        if (!receipt.success) {
+          const reason = receipt.reason || "QRIS removal failed";
+          throw new Error(reason);
+        }
+        setStatus("QRIS removed on-chain");
         return receipt.txHash || userOpHash;
       } catch (err) {
         const message = transformError(err);
@@ -2266,6 +2358,7 @@ export function useSmartAccount() {
     approvePaymaster,
     claimFaucet,
     registerQris,
+    removeMyQris,
     initSmartAccount: ensureClient,
     swapTokens,
     swapAndTransfer,

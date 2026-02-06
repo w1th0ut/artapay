@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { createPublicClient, http, type Address } from "viem";
 import { CheckCircle, Loader2 } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { useSmartAccount } from "@/hooks/useSmartAccount";
 import { BASE_SEPOLIA } from "@/config/chains";
 import { DEFAULT_TOKEN_SYMBOL, QRIS_REGISTRY_ADDRESS } from "@/config/constants";
@@ -17,6 +18,7 @@ import ImportFromGallery from "@/components/ScanQRCode/ImportFromGallery";
 type QrisInfo = {
   qrisHash: string;
   sa: string;
+  qrisPayload: string;
   merchantName: string;
   merchantId: string;
   merchantCity: string;
@@ -30,6 +32,7 @@ export default function ProfileContent() {
     smartAccountAddress,
     isReady,
     registerQris,
+    removeMyQris,
     isLoading,
     status,
   } = useSmartAccount();
@@ -49,11 +52,15 @@ export default function ProfileContent() {
   const [parsedQris, setParsedQris] = useState<QrisParseResult | null>(null);
   const [parseError, setParseError] = useState<string | null>(null);
   const [qrisInfo, setQrisInfo] = useState<QrisInfo | null>(null);
-  const [isWhitelisted, setIsWhitelisted] = useState<boolean | null>(null);
   const [isLoadingInfo, setIsLoadingInfo] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
+  const [isRemoving, setIsRemoving] = useState(false);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
 
-  const [successTx, setSuccessTx] = useState<string | null>(null);
+  const [successModal, setSuccessModal] = useState<{
+    title: string;
+    message: string;
+  } | null>(null);
   const [errorModal, setErrorModal] = useState<{
     isOpen: boolean;
     title: string;
@@ -69,6 +76,7 @@ export default function ProfileContent() {
       setParsedQris(parsed);
       setParseError(null);
       setIsCameraOpen(false);
+      setIsConfirmOpen(true);
     } catch (err) {
       const message =
         err instanceof Error ? err.message : "Invalid QRIS payload";
@@ -93,33 +101,22 @@ export default function ProfileContent() {
   const loadRegistryInfo = useCallback(async () => {
     if (!smartAccountAddress) {
       setQrisInfo(null);
-      setIsWhitelisted(null);
       return;
     }
 
     setIsLoadingInfo(true);
     try {
-      const [info, whitelist] = await Promise.all([
-        publicClient.readContract({
-          address: QRIS_REGISTRY_ADDRESS,
-          abi: QRIS_REGISTRY_ABI,
-          functionName: "getQrisBySa",
-          args: [smartAccountAddress],
-        }) as Promise<QrisInfo>,
-        publicClient.readContract({
-          address: QRIS_REGISTRY_ADDRESS,
-          abi: QRIS_REGISTRY_ABI,
-          functionName: "isWhitelisted",
-          args: [smartAccountAddress],
-        }) as Promise<boolean>,
-      ]);
+      const info = (await publicClient.readContract({
+        address: QRIS_REGISTRY_ADDRESS,
+        abi: QRIS_REGISTRY_ABI,
+        functionName: "getQrisBySa",
+        args: [smartAccountAddress],
+      })) as QrisInfo;
 
       setQrisInfo(info);
-      setIsWhitelisted(whitelist);
     } catch (err) {
       console.error("Failed to load QRIS registry:", err);
       setQrisInfo(null);
-      setIsWhitelisted(null);
     } finally {
       setIsLoadingInfo(false);
     }
@@ -130,11 +127,9 @@ export default function ProfileContent() {
   }, [loadRegistryInfo]);
 
   const isRegistered = Boolean(qrisInfo?.active && qrisInfo.sa !== ZERO_ADDRESS);
-  const isWhitelistReady = isWhitelisted === true;
 
   const canRegister =
     !!smartAccountAddress &&
-    isWhitelistReady &&
     !isRegistered &&
     !!parsedQris &&
     !parseError;
@@ -144,15 +139,19 @@ export default function ProfileContent() {
 
     setIsRegistering(true);
     try {
-      const txHash = await registerQris({
+      await registerQris({
         qrisHash: parsedQris.hash,
+        qrisPayload: parsedQris.raw,
         merchantName: parsedQris.merchantName,
         merchantId: parsedQris.merchantId,
         merchantCity: parsedQris.merchantCity,
         feeToken: defaultGasToken.tokenAddress as Address,
         feeTokenDecimals: defaultGasToken.decimals,
       });
-      setSuccessTx(txHash);
+      setSuccessModal({
+        title: "QRIS Registered",
+        message: "QRIS has been registered successfully.",
+      });
       await loadRegistryInfo();
     } catch (err) {
       setErrorModal({
@@ -163,6 +162,44 @@ export default function ProfileContent() {
       });
     } finally {
       setIsRegistering(false);
+    }
+  };
+
+  const handleConfirmCancel = () => {
+    setIsConfirmOpen(false);
+    setParsedQris(null);
+    setParseError(null);
+  };
+
+  const handleConfirmRegister = async () => {
+    setIsConfirmOpen(false);
+    await handleRegister();
+  };
+
+  const handleRemove = async () => {
+    if (!smartAccountAddress || !isRegistered) return;
+
+    setIsRemoving(true);
+    try {
+      await removeMyQris({
+        feeToken: defaultGasToken.tokenAddress as Address,
+        feeTokenDecimals: defaultGasToken.decimals,
+      });
+      setSuccessModal({
+        title: "QRIS Removed",
+        message: "QRIS has been removed successfully.",
+      });
+      setParsedQris(null);
+      setParseError(null);
+      await loadRegistryInfo();
+    } catch (err) {
+      setErrorModal({
+        isOpen: true,
+        title: "QRIS Removal Failed",
+        message: err instanceof Error ? err.message : "Failed to remove QRIS",
+      });
+    } finally {
+      setIsRemoving(false);
     }
   };
 
@@ -181,119 +218,110 @@ export default function ProfileContent() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+      {isRegistered && (
         <div className="p-4 bg-zinc-900/60 border border-zinc-800 rounded-2xl space-y-3">
-          <h3 className="text-sm font-semibold text-white">QRIS Registry</h3>
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-white">Registered QRIS</h3>
+            <button
+              type="button"
+              onClick={handleRemove}
+              disabled={isRemoving || isLoading}
+              className="px-3 py-1.5 text-[11px] rounded-full border border-red-500/40 text-red-300 hover:bg-red-500/10 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isRemoving || isLoading ? "Removing..." : "Remove QRIS"}
+            </button>
+          </div>
           {isLoadingInfo ? (
             <div className="flex items-center gap-2 text-zinc-400 text-sm">
               <Loader2 className="w-4 h-4 animate-spin" />
               Loading registry...
             </div>
           ) : (
-            <>
-              <StatusRow label="Whitelist" value={isWhitelisted} />
-              <StatusRow label="Registered" value={isRegistered} />
-            </>
-          )}
-        </div>
-
-        <div className="p-4 bg-zinc-900/60 border border-zinc-800 rounded-2xl space-y-3">
-          <h3 className="text-sm font-semibold text-white">Registered QRIS</h3>
-          {isRegistered ? (
-            <div className="space-y-2 text-xs">
-              <InfoRow label="Merchant" value={qrisInfo?.merchantName || "-"} />
-              <InfoRow label="Merchant ID" value={qrisInfo?.merchantId || "-"} />
-              <InfoRow
-                label="City"
-                value={qrisInfo?.merchantCity || "-"}
-              />
-              <InfoRow
-                label="Hash"
-                value={qrisInfo?.qrisHash || "-"}
-                mono
-              />
-            </div>
-          ) : (
-            <div className="text-xs text-zinc-500">
-              No QRIS registered yet.
+            <div className="space-y-3">
+              <div className="flex justify-center">
+                <div className="p-3 bg-white rounded-xl">
+                  <QRCodeSVG
+                    value={qrisInfo?.qrisPayload || ""}
+                    size={140}
+                    className="sm:w-[170px] sm:h-[170px]"
+                  />
+                </div>
+              </div>
+              <div className="space-y-2 text-xs">
+                <InfoRow
+                  label="Merchant"
+                  value={qrisInfo?.merchantName || "-"}
+                />
+                <InfoRow
+                  label="Merchant ID"
+                  value={qrisInfo?.merchantId || "-"}
+                />
+                <InfoRow label="City" value={qrisInfo?.merchantCity || "-"} />
+              </div>
             </div>
           )}
         </div>
-      </div>
+      )}
 
-      <div className="p-4 bg-zinc-900/60 border border-zinc-800 rounded-2xl space-y-4">
-        <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-white">Register QRIS</h3>
-          {isWhitelisted === false && (
-            <span className="text-[11px] text-orange-300 border border-orange-400/40 px-2 py-0.5 rounded-full">
-              Require whitelist
-            </span>
-          )}
-        </div>
+      {!isRegistered && (
+        <div className="p-4 bg-zinc-900/60 border border-zinc-800 rounded-2xl space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-white">Register QRIS</h3>
+          </div>
 
-        {isCameraOpen ? (
-          <OpenCamera
-            onScan={handleParsed}
-            onBack={handleBack}
-            onError={(err) =>
-              setErrorModal({
-                isOpen: true,
-                title: "Camera Error",
-                message: err.message,
-              })
-            }
-          />
-        ) : (
-          <div className="space-y-3">
-            <ClosedCamera
-              onScanNow={handleScanNow}
-              disabled={isRegistered || !isWhitelistReady}
-            />
-            <p className="text-accent text-sm text-center">or</p>
-            <ImportFromGallery
-              onImport={handleParsed}
-              disabled={isRegistered || !isWhitelistReady}
+          {isCameraOpen ? (
+            <OpenCamera
+              onScan={handleParsed}
+              onBack={handleBack}
               onError={(err) =>
                 setErrorModal({
                   isOpen: true,
-                  title: "Import Failed",
-                  message: err,
+                  title: "Camera Error",
+                  message: err.message,
                 })
               }
             />
-            {parseError && (
-              <div className="text-xs text-red-400 text-center">
-                {parseError}
-              </div>
-            )}
-          </div>
-        )}
+          ) : (
+            <div className="space-y-3">
+              <ClosedCamera onScanNow={handleScanNow} disabled={isRegistered} />
+              <p className="text-accent text-sm text-center">or</p>
+              <ImportFromGallery
+                onImport={handleParsed}
+                disabled={isRegistered}
+                onError={(err) =>
+                  setErrorModal({
+                    isOpen: true,
+                    title: "Import Failed",
+                    message: err,
+                  })
+                }
+              />
+              {parseError && (
+                <div className="text-xs text-red-400 text-center">
+                  {parseError}
+                </div>
+              )}
+            </div>
+          )}
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-          <PreviewCard label="Merchant name" value={parsedQris?.merchantName} />
-          <PreviewCard label="Merchant ID" value={parsedQris?.merchantId} />
-          <PreviewCard label="Merchant city" value={parsedQris?.merchantCity} />
-          <PreviewCard label="Hash" value={parsedQris?.hash} mono />
-        </div>
-
-        <div className="text-[11px] text-zinc-500">
-          Only whitelisted Smart Accounts can register QRIS. Please submit your
-          verification through internal process if needed.
-        </div>
-
-        <button
-          type="button"
-          onClick={handleRegister}
-          disabled={!canRegister || isRegistering || isLoading}
-          className="w-full py-3 rounded-xl bg-primary text-black font-semibold text-sm hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {isRegistering || isLoading ? "REGISTERING..." : "REGISTER QRIS"}
-        </button>
-
-        {(isRegistering || isLoading) && status && (
-          <div className="text-xs text-primary text-center">{status}</div>
-        )}
+          {parsedQris && (
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <PreviewCard
+                label="Merchant name"
+                value={parsedQris.merchantName}
+              />
+              <PreviewCard
+                label="Merchant ID"
+                value={parsedQris.merchantId}
+              />
+              <PreviewCard
+                label="Merchant city"
+                value={parsedQris.merchantCity}
+              />
+            </div>
+          )}
       </div>
+      )}
 
       <Modal
         id="qris-register-success"
@@ -302,13 +330,59 @@ export default function ProfileContent() {
         aria-labelledby="qris-success-title"
         aria-describedby="qris-success-desc"
         tabIndex={-1}
-        isOpen={!!successTx}
-        onClose={() => setSuccessTx(null)}
-        title="QRIS Registered"
-        message="Registration submitted."
+        isOpen={!!successModal}
+        onClose={() => setSuccessModal(null)}
+        title={successModal?.title}
+        message={successModal?.message}
         variant="success"
         icon={<CheckCircle className="w-8 h-8 text-emerald-400" />}
       />
+
+      <Modal
+        id="qris-confirm-modal"
+        role="dialog"
+        aria-modal={true}
+        aria-labelledby="qris-confirm-title"
+        aria-describedby="qris-confirm-desc"
+        tabIndex={-1}
+        isOpen={isConfirmOpen && !!parsedQris}
+        onClose={handleConfirmCancel}
+        title="Confirm QRIS"
+        message="Please confirm the QRIS details before registering."
+        variant="success"
+        icon={<CheckCircle className="w-8 h-8 text-emerald-400" />}
+      >
+        <div className="space-y-3">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+            <PreviewCard
+              label="Merchant name"
+              value={parsedQris?.merchantName}
+            />
+            <PreviewCard label="Merchant ID" value={parsedQris?.merchantId} />
+            <PreviewCard
+              label="Merchant city"
+              value={parsedQris?.merchantCity}
+            />
+          </div>
+          {canRegister && (
+            <button
+              type="button"
+              onClick={handleConfirmRegister}
+              disabled={isRegistering || isLoading}
+              className="w-full py-3 bg-primary text-black font-bold text-sm rounded-xl hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {isRegistering || isLoading ? "REGISTERING..." : "CONFIRM REGISTER"}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={handleConfirmCancel}
+            className="w-full py-2.5 border border-zinc-600 text-zinc-200 text-sm rounded-xl hover:bg-zinc-700/40 transition-colors"
+          >
+            Cancel
+          </button>
+        </div>
+      </Modal>
 
       <Modal
         id="qris-register-error"
@@ -323,25 +397,6 @@ export default function ProfileContent() {
         title={errorModal.title}
         message={errorModal.message}
       />
-    </div>
-  );
-}
-
-function StatusRow({ label, value }: { label: string; value: boolean | null }) {
-  if (value === null) {
-    return (
-      <div className="text-xs text-zinc-500 flex items-center justify-between">
-        <span>{label}</span>
-        <span>-</span>
-      </div>
-    );
-  }
-  return (
-    <div className="text-xs flex items-center justify-between">
-      <span className="text-zinc-400">{label}</span>
-      <span className={value ? "text-green-400" : "text-red-400"}>
-        {value ? "Yes" : "No"}
-      </span>
     </div>
   );
 }
