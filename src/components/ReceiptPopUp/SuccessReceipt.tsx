@@ -61,7 +61,9 @@ export default function SuccessReceipt({
       {/* Success Icon */}
       <div className="flex flex-col items-center mb-4 sm:mb-5">
         <Image src={SuccessIcon} alt="Success" width={56} height={56} />
-        <p className="text-primary font-medium mt-2 text-sm sm:text-base">Success!</p>
+        <p className="text-primary font-medium mt-2 text-sm sm:text-base">
+          Success!
+        </p>
       </div>
       {/* Receipt Title */}
       <h2 className="text-white text-base sm:text-lg font-bold text-center mb-4 sm:mb-5">
@@ -89,7 +91,9 @@ export default function SuccessReceipt({
         </div>
         {displayAddress && (
           <div className="flex justify-between items-center gap-4">
-            <span className="text-zinc-400 text-xs sm:text-sm">{getAddressLabel()}</span>
+            <span className="text-zinc-400 text-xs sm:text-sm">
+              {getAddressLabel()}
+            </span>
             <div className="flex items-center gap-1.5">
               <span className="text-white font-mono text-xs sm:text-sm">
                 {shortenAddress(displayAddress)}
@@ -104,7 +108,9 @@ export default function SuccessReceipt({
           </div>
         )}
         <div className="flex justify-between items-center gap-4">
-          <span className="text-zinc-400 text-xs sm:text-sm">Sender's currency</span>
+          <span className="text-zinc-400 text-xs sm:text-sm">
+            Sender's currency
+          </span>
           <div className="flex items-center gap-1.5">
             <Image
               src={data.senderCurrencyIcon || data.currencyIcon}
@@ -118,7 +124,9 @@ export default function SuccessReceipt({
           </div>
         </div>
         <div className="flex justify-between items-center gap-4">
-          <span className="text-zinc-400 text-xs sm:text-sm">Receiver's currency</span>
+          <span className="text-zinc-400 text-xs sm:text-sm">
+            Receiver's currency
+          </span>
           <div className="flex items-center gap-1.5">
             {data.type === "swap" && data.swapToCurrencyIcon ? (
               <>
@@ -128,12 +136,16 @@ export default function SuccessReceipt({
                   width={18}
                   height={18}
                 />
-                <span className="text-white text-xs sm:text-sm">{data.swapToCurrency}</span>
+                <span className="text-white text-xs sm:text-sm">
+                  {data.swapToCurrency}
+                </span>
               </>
             ) : (
               <>
                 <Image src={data.currencyIcon} alt="" width={18} height={18} />
-                <span className="text-white text-xs sm:text-sm">{data.currency}</span>
+                <span className="text-white text-xs sm:text-sm">
+                  {data.currency}
+                </span>
               </>
             )}
           </div>
@@ -141,7 +153,9 @@ export default function SuccessReceipt({
         {/* Separator */}
         <div className="border-t border-zinc-700 pt-3 sm:pt-4">
           <div className="flex justify-between items-center gap-4">
-            <span className="text-zinc-400 text-xs sm:text-sm">Total Amount</span>
+            <span className="text-zinc-400 text-xs sm:text-sm">
+              Total Amount
+            </span>
             <span className="text-xs sm:text-sm">
               <span className="text-primary font-bold">{data.amount}</span>
               <span className="text-white ml-1">{data.currency}</span>
@@ -149,13 +163,43 @@ export default function SuccessReceipt({
           </div>
           {data.type === "swap" && data.swapToAmount && (
             <div className="flex justify-between items-center gap-4 mt-2">
-              <span className="text-zinc-400 text-xs sm:text-sm">Converted to</span>
+              <span className="text-zinc-400 text-xs sm:text-sm">
+                Converted to
+              </span>
               <span className="text-xs sm:text-sm">
                 <span className="text-primary font-bold">
                   {data.swapToAmount}
                 </span>
                 <span className="text-white ml-1">{data.swapToCurrency}</span>
               </span>
+            </div>
+          )}
+          {/* Multi-token breakdown */}
+          {data.tokenBreakdown && data.tokenBreakdown.length > 1 && (
+            <div className="mt-3 pt-3 border-t border-zinc-700/50">
+              <span className="text-zinc-400 text-xs block mb-2">
+                Paid with:
+              </span>
+              <div className="space-y-1">
+                {data.tokenBreakdown.map((token) => (
+                  <div
+                    key={token.symbol}
+                    className="flex justify-between items-center gap-2"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <Image src={token.icon} alt="" width={14} height={14} />
+                      <span className="text-zinc-300 text-xs">
+                        {token.symbol}
+                      </span>
+                    </div>
+                    <span className="text-white text-xs font-mono">
+                      {token.amount.toLocaleString(undefined, {
+                        maximumFractionDigits: 6,
+                      })}
+                    </span>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
         </div>

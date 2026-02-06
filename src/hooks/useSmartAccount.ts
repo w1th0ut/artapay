@@ -1982,6 +1982,142 @@ export function useSmartAccount() {
     [ensureClient, getFeeParams, waitForUserOp],
   );
 
+  /**
+   * qrisMultiTokenPayment: For QRIS payments where user pays with multiple tokens
+   * Batches all approvals, swaps, and final transfer into a SINGLE UserOperation
+   * This ensures only ONE signature is required
+   */
+  const qrisMultiTokenPayment = useCallback(
+    async (params: {
+      payments: {
+        token: Address;
+        amount: bigint;
+        decimals: number;
+        needsSwap: boolean;
+        swapAmountOut?: bigint; // Pre-calculated swap output
+      }[];
+      targetToken: Address;
+      targetTokenDecimals: number;
+      recipient: Address;
+      totalAmountOut: bigint; // Total to transfer to recipient
+      stableSwapAddress: Address;
+    }) => {
+      setError(null);
+      setIsLoading(true);
+      try {
+        if (params.payments.length === 0) {
+          throw new Error("At least one payment token required");
+        }
+
+        const { client, address } = await ensureClient();
+        const feeParams = await getFeeParams();
+
+        // Use first payment token for paymaster fee
+        const feeToken = params.payments[0].token;
+
+        const validUntil = Math.floor(Date.now() / 1000) + 3600;
+        const validAfter = 0;
+        setStatus("Requesting paymaster signature for QRIS payment...");
+        const signature = await getPaymasterSignature({
+          payerAddress: address,
+          tokenAddress: feeToken,
+          validUntil,
+          validAfter,
+          isActivation: false,
+        });
+
+        const paymasterData = buildPaymasterData({
+          tokenAddress: feeToken,
+          payerAddress: address,
+          validUntil,
+          validAfter,
+          hasPermit: false,
+          isActivation: false,
+          signature: signature as `0x${string}`,
+        });
+
+        const calls: { to: Address; data: `0x${string}`; value: bigint }[] = [];
+
+        // Build all approve and swap calls for tokens that need swap
+        for (const payment of params.payments) {
+          if (payment.needsSwap && payment.swapAmountOut) {
+            // Approve StableSwap
+            calls.push({
+              to: payment.token,
+              data: encodeFunctionData({
+                abi: ERC20_ABI,
+                functionName: "approve",
+                args: [params.stableSwapAddress, maxUint256],
+              }),
+              value: BigInt(0),
+            });
+
+            // Swap to target token (to self)
+            calls.push({
+              to: params.stableSwapAddress,
+              data: encodeFunctionData({
+                abi: STABLE_SWAP_ABI,
+                functionName: "swap",
+                args: [
+                  payment.amount,
+                  payment.token,
+                  params.targetToken,
+                  payment.swapAmountOut,
+                ],
+              }),
+              value: BigInt(0),
+            });
+          }
+        }
+
+        // Final transfer of accumulated target token to recipient
+        calls.push({
+          to: params.targetToken,
+          data: encodeFunctionData({
+            abi: ERC20_ABI,
+            functionName: "transfer",
+            args: [params.recipient, params.totalAmountOut],
+          }),
+          value: BigInt(0),
+        });
+
+        setStatus("Submitting QRIS multi-token payment...");
+        const res = await client.sendCalls({
+          calls,
+          paymaster: PAYMASTER_ADDRESS,
+          paymasterData,
+          paymasterVerificationGasLimit: BigInt(300_000),
+          paymasterPostOpGasLimit: BigInt(300_000),
+          callGasLimit: BigInt(2_500_000),
+          verificationGasLimit: BigInt(1_200_000),
+          preVerificationGas: PRE_VERIFICATION_GAS,
+          ...feeParams,
+        });
+
+        const userOpHash = res.id as `0x${string}`;
+        setStatus("Waiting for QRIS payment confirmation...");
+        const receipt = await waitForUserOp(userOpHash);
+        if (!receipt.success) {
+          throw new Error(receipt.reason || "QRIS multi-token payment failed");
+        }
+
+        setStatus("QRIS payment executed");
+        return {
+          txHash: receipt.txHash || userOpHash,
+          totalAmountOut: params.totalAmountOut,
+        };
+      } catch (err) {
+        const message = transformError(err);
+        setError(message);
+        setStatus(message);
+        throw new Error(message);
+      } finally {
+        setIsLoading(false);
+      }
+    },
+    [ensureClient, getFeeParams, waitForUserOp],
+  );
+
   const signMessageWithEOA = useCallback(
     async (hash: `0x${string}`) => {
       if (!effectiveWalletClient) {
@@ -2136,6 +2272,7 @@ export function useSmartAccount() {
     swapAndBatchTransfer,
     payInvoice,
     payMultiTokenInvoice,
+    qrisMultiTokenPayment,
     signMessageWithEOA,
     baseAppDeployment,
     deployBaseAccount,

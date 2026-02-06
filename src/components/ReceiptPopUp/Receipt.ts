@@ -24,6 +24,12 @@ export interface ReceiptData {
   txHash?: string;
   // Error message for failed transactions
   errorMessage?: string;
+  // For multi-token payments: breakdown of tokens used
+  tokenBreakdown?: {
+    symbol: string;
+    amount: number;
+    icon: string;
+  }[];
 }
 
 /**
