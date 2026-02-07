@@ -1,13 +1,14 @@
 # ArtaPay Frontend
-Frontend web app for the ArtaPay dApp built with Next.js that provides wallet onboarding, QR payments, swaps, top up IDRX or USDC via IDRX API and activity views for Base Sepolia.
+Frontend web app for the ArtaPay dApp built with Next.js that provides wallet onboarding, QR payments, swaps, top up IDRX or USDC via IDRX API and activity views for Base Sepolia and Etherlink Shadownet.
 
 ## Overview
 ArtaPay Frontend provides:
 
+- **Multichain**: Support Base Sepolia and Etherlink Shadownet
 - **Wallet + Smart Account Onboarding**: Privy auth, Base App login, ERC-4337 smart accounts
 - **Gasless Activation**: One-time approval for multi-token paymaster sponsorship
 - **Send & Receive**: Single transfer, batch transfer, and multi-token payments
-- **ENS Support**: Send to Base mainnet ENS names (via mainnet RPC resolver)
+- **ENS Support**: Send to Base mainnet and Etherlink mainnet ENS names (via mainnet resolver)
 - **QR Payments**: Scan and generate payment requests
 - **QRIS Supported**: Pay to QRIS (Quick Response Code Indonesian Standard)
 - **Stablecoin Swaps**: Quote and execute swaps via StableSwap
@@ -80,6 +81,24 @@ npm install
 Create a `.env` file in the root directory:
 
 ```bash
+#=====================================================
+# Environment Variables for Artapay Frontend
+#=====================================================
+NEXT_PUBLIC_PIMLICO_API_KEY=
+NEXT_PUBLIC_SIGNER_API_URL=http://localhost:3001
+NEXT_PUBLIC_PRIVY_APP_ID=
+NEXT_PUBLIC_DEFAULT_TOKEN_SYMBOL=USDC
+NEXT_PUBLIC_DEFAULT_CHAIN=etherlink
+
+IDRX_API_KEY=
+IDRX_SECRET_KEY=
+IDRX_BASE_URL=https://idrx.co/api
+IDRX_NETWORK_CHAIN_ID=8453
+IDRX_NETWORK_CHAIN_ID_ETHERLINK=42793
+
+#=====================================================
+# Base Sepolia Testnet Configuration
+#=====================================================
 NEXT_PUBLIC_CHAIN_ID=84532
 NEXT_PUBLIC_CHAIN_NAME=Base Sepolia
 NEXT_PUBLIC_RPC_URL=https://sepolia.base.org
@@ -90,8 +109,7 @@ NEXT_PUBLIC_NATIVE_CURRENCY_NAME=Ether
 NEXT_PUBLIC_NATIVE_CURRENCY_SYMBOL=ETH
 NEXT_PUBLIC_NATIVE_CURRENCY_DECIMALS=18
 
-NEXT_PUBLIC_PIMLICO_API_KEY=
-NEXT_PUBLIC_ENTRY_POINT_ADDRESS=
+NEXT_PUBLIC_ENTRY_POINT_ADDRESS=0x0000000071727De22E5E9d8BAf0edAc6f37da032
 NEXT_PUBLIC_SIMPLE_ACCOUNT_FACTORY=
 NEXT_PUBLIC_PAYMASTER_ADDRESS=
 NEXT_PUBLIC_STABLE_SWAP_ADDRESS=
@@ -99,10 +117,6 @@ NEXT_PUBLIC_PAYMENT_PROCESSOR_ADDRESS=
 NEXT_PUBLIC_STABLECOIN_REGISTRY_ADDRESS=
 NEXT_PUBLIC_QRIS_REGISTRY_ADDRESS=
 
-NEXT_PUBLIC_SIGNER_API_URL=http://localhost:3001
-NEXT_PUBLIC_PRIVY_APP_ID=
-
-NEXT_PUBLIC_DEFAULT_TOKEN_SYMBOL=USDC
 NEXT_PUBLIC_TOKEN_USDC_ADDRESS=
 NEXT_PUBLIC_TOKEN_USDC_DECIMALS=6
 NEXT_PUBLIC_TOKEN_USDS_ADDRESS=
@@ -121,13 +135,37 @@ NEXT_PUBLIC_TOKEN_TGBP_ADDRESS=
 NEXT_PUBLIC_TOKEN_TGBP_DECIMALS=18
 NEXT_PUBLIC_TOKEN_IDRX_ADDRESS=
 NEXT_PUBLIC_TOKEN_IDRX_DECIMALS=6
+NEXT_PUBLIC_ACTIVITY_LOOKBACK_BLOCKS=20000
 
-NEXT_PUBLIC_ACTIVITY_LOOKBACK_BLOCKS=200000
+# =====================================================
+# Etherlink Shadownet Testnet Configuration
+# =====================================================
+NEXT_PUBLIC_CHAIN_ID_ETHERLINK=127823
+NEXT_PUBLIC_CHAIN_NAME_ETHERLINK=Etherlink Shadownet
+NEXT_PUBLIC_RPC_URL_ETHERLINK=https://node.shadownet.etherlink.com
+NEXT_PUBLIC_MAINNET_RPC_URL_ETHERLINK=https://ethereum-rpc.publicnode.com
+NEXT_PUBLIC_BLOCK_EXPLORER_NAME_ETHERLINK=Etherlink Explorer
+NEXT_PUBLIC_BLOCK_EXPLORER_URL_ETHERLINK=https://shadownet.explorer.etherlink.com
+NEXT_PUBLIC_NATIVE_CURRENCY_NAME_ETHERLINK=Tezos
+NEXT_PUBLIC_NATIVE_CURRENCY_SYMBOL_ETHERLINK=XTZ
+NEXT_PUBLIC_NATIVE_CURRENCY_DECIMALS_ETHERLINK=18
 
-IDRX_API_KEY=
-IDRX_SECRET_KEY=
-IDRX_BASE_URL=https://idrx.co/api
-IDRX_NETWORK_CHAIN_ID=
+NEXT_PUBLIC_ENTRY_POINT_ADDRESS_ETHERLINK=0x0000000071727De22E5E9d8BAf0edAc6f37da032
+NEXT_PUBLIC_SIMPLE_ACCOUNT_FACTORY_ETHERLINK=
+NEXT_PUBLIC_PAYMASTER_ADDRESS_ETHERLINK=
+NEXT_PUBLIC_STABLE_SWAP_ADDRESS_ETHERLINK=
+NEXT_PUBLIC_PAYMENT_PROCESSOR_ADDRESS_ETHERLINK=
+NEXT_PUBLIC_STABLECOIN_REGISTRY_ADDRESS_ETHERLINK=
+NEXT_PUBLIC_QRIS_REGISTRY_ADDRESS_ETHERLINK=
+
+NEXT_PUBLIC_TOKEN_USDT_ADDRESS_ETHERLINK=
+NEXT_PUBLIC_TOKEN_USDT_DECIMALS_ETHERLINK=6
+NEXT_PUBLIC_TOKEN_USDC_ADDRESS_ETHERLINK=
+NEXT_PUBLIC_TOKEN_USDC_DECIMALS_ETHERLINK=6
+NEXT_PUBLIC_TOKEN_IDRX_ADDRESS_ETHERLINK=
+NEXT_PUBLIC_TOKEN_IDRX_DECIMALS_ETHERLINK=6
+
+NEXT_PUBLIC_ACTIVITY_LOOKBACK_BLOCKS_ETHERLINK=20000
 ```
 
 Note: Use `.env.example` for the full list of token variables.
@@ -159,9 +197,16 @@ npm run start
 - **Block Explorer**: https://base-sepolia.blockscout.com
 - **EntryPoint v0.7**: `0x0000000071727De22E5E9d8BAf0edAc6f37da032`
 
+### Etherlink Shadownet Testnet
+
+- **Chain ID**: 127823
+- **RPC URL**: https://node.shadownet.etherlink.com
+- **Block Explorer**: https://shadownet.explorer.etherlink.com
+- **Faucet**: https://shadownet.faucet.etherlink.com/
+
 ### ENS Resolution
 
-- ENS lookups use `NEXT_PUBLIC_MAINNET_RPC_URL` (Base mainnet).
+- ENS lookups use `NEXT_PUBLIC_MAINNET_RPC_URL` (Base mainnet) and `NEXT_PUBLIC_MAINNET_RPC_URL_ETHERLINK` (Etherlink mainnet).
 
 ## Supported Stablecoins
 
@@ -199,6 +244,23 @@ Mock Tokens:
   ZCHF:  0xF27edF22FD76A044eA5B77E1958863cf9A356132
   tGBP:  0xb4db79424725256a6E6c268fc725979b24171857
   IDRX:  0x34976B6c7Aebe7808c7Cab34116461EB381Bc2F8
+```
+
+### Etherlink Shadownet (Testnet)
+
+```
+EntryPoint:            0x0000000071727De22E5E9d8BAf0edAc6f37da032
+StablecoinRegistry:    0x6fe372ef0B695ec05575D541e0DA60bf18A3D0f0
+Paymaster:             0xFC7E8c60315e779b1109B252fcdBFB8f3524F9B6
+StableSwap:            0xB67b210dEe4C1A744c1d51f153b3B3caF5428F60
+PaymentProcessor:      0x5D4748951fB0AF37c57BcCb024B3EE29360148bc
+SimpleAccountFactory:  0xb7E56FbAeC1837c5693AAf35533cc94e35497d86
+QRISRegistry:          0xD17d8f2819C068A57f0F4674cF439d1eC96C56f5
+
+Mock Tokens:
+  USDC:  0x60E48d049EB0c75BF428B028Da947c66b68f5dd2
+  USDT:  0xcaF86109F34d74DE0e554FD5E652C412517374fb
+  IDRX:  0x8A272505426D4F129EE3493A837367B884653237
 ```
 
 ## Security Considerations
