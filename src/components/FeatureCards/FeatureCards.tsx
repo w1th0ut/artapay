@@ -112,6 +112,11 @@ export default function FeatureCards() {
 
   const features: FeatureCardItem[] = [
     {
+      title: "Multichain Ready",
+      description:
+        "Runs on Base Sepolia and Etherlink Shadownet for seamless multi-chain payments.",
+    },
+    {
       title: "Gasless Transactions",
       description:
         "Using Paymaster (ERC-4337) pay gas fees directly with stablecoins. No ETH required.",

@@ -9,11 +9,11 @@ interface TechItem {
 }
 
 const techStack: TechItem[] = [
-    { name: 'Foundry', icon: '/icons/Foundry.svg' },
+    { name: 'Etherlink', icon: '/icons/Etherlink.svg' },
     { name: 'Pimlico', icon: '/icons/pimlico.svg' },
     { name: 'Base', icon: '/icons/Base.svg' },
     { name: 'Wagmi', icon: '/icons/Wagmi.svg' },
-    { name: 'Viem', icon: '/icons/Viem.svg' },
+    { name: 'Foundry', icon: '/icons/Foundry.svg' },
     { name: 'Privy', icon: '/icons/Privy.svg' },
 ];
 

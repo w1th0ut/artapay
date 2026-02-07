@@ -5,6 +5,7 @@ import CoinMarqueeCard from "./CoinMarqueeCard";
 const supportedCoins = [
     { icon: "/icons/idrx.svg", name: "IDRX" },
     { icon: "/icons/usdc.svg", name: "USDC" },
+    { icon: "/icons/usdt.svg", name: "USDT" },
     { icon: "/icons/sky-dollar.svg", name: "USDS" },
     { icon: "/icons/eurc.svg", name: "EURC" },
     { icon: "/icons/cad.svg", name: "CADC" },

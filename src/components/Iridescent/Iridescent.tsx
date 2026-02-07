@@ -62,6 +62,7 @@ export default function Iridescence({
 }: IridescenceProps) {
   const ctnDom = useRef<HTMLDivElement>(null);
   const mousePos = useRef({ x: 0.5, y: 0.5 });
+  const sizeRef = useRef({ w: 0, h: 0, pending: false });
 
   useEffect(() => {
     if (!ctnDom.current) return;
@@ -72,19 +73,18 @@ export default function Iridescence({
 
     let program: Program;
 
-    function resize() {
-      const scale = 1;
-      renderer.setSize(ctn.offsetWidth * scale, ctn.offsetHeight * scale);
-      if (program) {
-        program.uniforms.uResolution.value = new Color(
-          gl.canvas.width,
-          gl.canvas.height,
-          gl.canvas.width / gl.canvas.height
-        );
+    function markResize() {
+      const w = ctn.offsetWidth;
+      const h = ctn.offsetHeight;
+      if (w <= 0 || h <= 0) return;
+      if (w !== sizeRef.current.w || h !== sizeRef.current.h) {
+        sizeRef.current = { w, h, pending: true };
       }
     }
-    window.addEventListener('resize', resize, false);
-    resize();
+    window.addEventListener('resize', markResize, false);
+    const resizeObserver = new ResizeObserver(() => markResize());
+    resizeObserver.observe(ctn);
+    markResize();
 
     const geometry = new Triangle(gl);
     program = new Program(gl, {
@@ -107,6 +107,16 @@ export default function Iridescence({
 
     function update(t: number) {
       animateId = requestAnimationFrame(update);
+      if (sizeRef.current.pending) {
+        const { w, h } = sizeRef.current;
+        renderer.setSize(w, h);
+        program.uniforms.uResolution.value = new Color(
+          gl.canvas.width,
+          gl.canvas.height,
+          gl.canvas.width / gl.canvas.height
+        );
+        sizeRef.current.pending = false;
+      }
       program.uniforms.uTime.value = t * 0.001;
       renderer.render({ scene: mesh });
     }
@@ -127,7 +137,8 @@ export default function Iridescence({
 
     return () => {
       cancelAnimationFrame(animateId);
-      window.removeEventListener('resize', resize);
+      window.removeEventListener('resize', markResize);
+      resizeObserver.disconnect();
       if (mouseReact) {
         ctn.removeEventListener('mousemove', handleMouseMove);
       }

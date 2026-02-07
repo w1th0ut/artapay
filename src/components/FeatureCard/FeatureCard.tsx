@@ -14,6 +14,12 @@ import batchHover from "@/assets/batch-hover.svg";
 
 const features = [
     {
+        title: "Multichain Ready",
+        description: "Base Sepolia + Etherlink Shadownet out of the box.",
+        imageDefault: "/base.png",
+        imageHover: "/etherlink.png",
+    },
+    {
         title: "Auto-Swap Engine",
         description: "Your tokens, your choice. We handle the conversion.",
         imageDefault: swapDefault.src,
