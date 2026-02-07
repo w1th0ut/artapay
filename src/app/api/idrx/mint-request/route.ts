@@ -5,7 +5,7 @@ export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
   try {
-    const { amount, walletAddress, campaignAddress, token } =
+    const { amount, walletAddress, campaignAddress, token, chain } =
       await request.json();
     const destinationAddress = walletAddress || campaignAddress;
     const normalizedToken =
@@ -27,6 +27,7 @@ export async function POST(request: NextRequest) {
       24,
       requestType,
       productDetails,
+      chain,
     );
 
     return NextResponse.json({

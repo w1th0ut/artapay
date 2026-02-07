@@ -1,18 +1,33 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { createPublicClient, http, type Address } from "viem";
-import { BASE_SEPOLIA } from "@/config/chains";
 import { ERC20_ABI, PAYMASTER_ABI } from "@/config/abi";
-import { TOKENS, PAYMASTER_ADDRESS } from "@/config/constants";
-
-const publicClient = createPublicClient({
-  chain: BASE_SEPOLIA,
-  transport: http(BASE_SEPOLIA.rpcUrls.default.http[0]),
-});
+import { useActiveChain } from "@/hooks/useActiveChain";
 
 export function useApprovalStatus(smartAccountAddress: Address | null) {
+  const { config } = useActiveChain();
+  const tokens = config.tokens;
+  const paymasterAddress = config.paymasterAddress;
+  const contextKey = `${config.key}:${smartAccountAddress ?? "none"}`;
+  const contextRef = useRef(contextKey);
+
+  const publicClient = useMemo(
+    () =>
+      createPublicClient({
+        chain: config.chain,
+        transport: http(config.rpcUrl),
+      }),
+    [config],
+  );
   const [isApproved, setIsApproved] = useState<boolean | null>(null);
   const [isChecking, setIsChecking] = useState(false);
   const [ethBalance, setEthBalance] = useState<bigint>(BigInt(0));
+
+  useEffect(() => {
+    contextRef.current = contextKey;
+    setIsApproved(null);
+    setIsChecking(Boolean(smartAccountAddress));
+    setEthBalance(BigInt(0));
+  }, [contextKey, smartAccountAddress, paymasterAddress]);
 
   const checkApproval = useCallback(
     async (showLoading = false) => {
@@ -27,10 +42,10 @@ export function useApprovalStatus(smartAccountAddress: Address | null) {
       try {
         // Check if all tokens are supported + approved to Paymaster
         const approvalChecks = await Promise.all(
-          TOKENS.map(async (token) => {
+          tokens.map(async (token) => {
             try {
               const supported = await publicClient.readContract({
-                address: PAYMASTER_ADDRESS,
+                address: paymasterAddress,
                 abi: PAYMASTER_ABI,
                 functionName: "isSupportedToken",
                 args: [token.address as Address],
@@ -39,11 +54,11 @@ export function useApprovalStatus(smartAccountAddress: Address | null) {
                 address: token.address as Address,
                 abi: ERC20_ABI,
                 functionName: "allowance",
-                args: [smartAccountAddress, PAYMASTER_ADDRESS],
+                args: [smartAccountAddress, paymasterAddress],
               });
               return Boolean(supported) && (allowance as bigint) > BigInt(0);
             } catch {
-              return false;
+              return null;
             }
           })
         );
@@ -52,20 +67,27 @@ export function useApprovalStatus(smartAccountAddress: Address | null) {
         const balance = await publicClient.getBalance({
           address: smartAccountAddress,
         });
-        setEthBalance(balance);
+        if (contextRef.current === contextKey) {
+          setEthBalance(balance);
+        }
 
+        const hasUnknown = approvalChecks.some((approved) => approved === null);
         const hasAllApprovals = approvalChecks.every((approved) => approved);
-        setIsApproved(hasAllApprovals);
+        if (contextRef.current === contextKey) {
+          setIsApproved(hasUnknown ? null : hasAllApprovals);
+        }
       } catch (err) {
         console.error("Failed to check approval status:", err);
-        setIsApproved(false);
+        if (contextRef.current === contextKey) {
+          setIsApproved(null);
+        }
       } finally {
         if (showLoading) {
           setIsChecking(false);
         }
       }
     },
-    [smartAccountAddress]
+    [smartAccountAddress, publicClient, paymasterAddress, tokens, contextKey]
   );
 
   useEffect(() => {
@@ -91,5 +113,11 @@ export function useApprovalStatus(smartAccountAddress: Address | null) {
     };
   }, [smartAccountAddress, checkApproval]);
 
-  return { isApproved, isChecking, ethBalance, refresh: checkApproval };
+  return {
+    isApproved,
+    isChecking,
+    ethBalance,
+    refresh: checkApproval,
+    contextKey,
+  };
 }

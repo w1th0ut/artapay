@@ -13,13 +13,14 @@ import {
 } from "@/components/Menu";
 import {
   WalletButton,
+  ChainSelector,
   BalanceDisplay,
   ActivationModal,
   FaucetButton,
 } from "@/components/Wallet";
 import { useSmartAccount } from "@/hooks/useSmartAccount";
 import { useApprovalStatus } from "@/hooks/useApprovalStatus";
-import { TOKENS } from "@/config/constants";
+import { useActiveChain } from "@/hooks/useActiveChain";
 
 const contentComponents = {
   send: SendContent,
@@ -34,6 +35,7 @@ const STORAGE_KEY = "artapay_active_menu";
 export default function Start() {
   const [activeMenu, setActiveMenu] = useState<MenuType>("send");
   const [isHydrated, setIsHydrated] = useState(false);
+  const [suppressActivation, setSuppressActivation] = useState(false);
 
   const {
     smartAccountAddress,
@@ -42,8 +44,15 @@ export default function Start() {
     baseAppDeployment,
     deployBaseAccount,
   } = useSmartAccount();
-  const { isApproved, isChecking, refresh } =
+  const { config } = useActiveChain();
+  const { isApproved, isChecking, refresh, contextKey } =
     useApprovalStatus(smartAccountAddress);
+
+  useEffect(() => {
+    setSuppressActivation(true);
+    const timer = setTimeout(() => setSuppressActivation(false), 1000);
+    return () => clearTimeout(timer);
+  }, [config.key]);
 
   useEffect(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
@@ -72,7 +81,7 @@ export default function Start() {
   );
 
   const handleActivate = async () => {
-    const tokenAddresses = TOKENS.map(
+    const tokenAddresses = config.tokens.map(
       (token) => token.address as `0x${string}`,
     );
     await approvePaymaster(tokenAddresses);
@@ -80,8 +89,13 @@ export default function Start() {
   };
 
   // Show activation modal if connected but not approved
+  const currentContextKey = `${config.key}:${smartAccountAddress ?? "none"}`;
   const showActivationModal =
-    smartAccountAddress && !isChecking && isApproved === false;
+    !suppressActivation &&
+    smartAccountAddress &&
+    !isChecking &&
+    isApproved === false &&
+    contextKey === currentContextKey;
 
   if (!isHydrated) {
     return (
@@ -101,7 +115,10 @@ export default function Start() {
 
           {/* Wallet Info - Address + Balance */}
           <div className="flex flex-col items-end gap-2">
-            <WalletButton />
+            <div className="flex items-center gap-2">
+              <ChainSelector />
+              <WalletButton />
+            </div>
             <BalanceDisplay />
             <FaucetButton />
           </div>

@@ -12,22 +12,18 @@ import {
 } from "lucide-react";
 import { createPublicClient, formatUnits, parseUnits, http } from "viem";
 import type { Address } from "viem";
-import { BASE_SEPOLIA } from "@/config/chains";
 import {
   ERC20_ABI,
   STABLE_SWAP_ABI,
   STABLECOIN_REGISTRY_ABI,
 } from "@/config/abi";
 import {
-  STABLE_SWAP_ADDRESS,
-  STABLECOIN_REGISTRY_ADDRESS,
-} from "@/config/constants";
-import {
   CurrencyDropdown,
-  currencies,
+  buildCurrencies,
   type Currency,
 } from "@/components/Currency";
 import { useSmartAccount } from "@/hooks/useSmartAccount";
+import { useActiveChain } from "@/hooks/useActiveChain";
 import Modal from "@/components/Modal";
 import { ReceiptPopUp, type ReceiptData } from "@/components/ReceiptPopUp";
 
@@ -35,6 +31,7 @@ import { ReceiptPopUp, type ReceiptData } from "@/components/ReceiptPopUp";
 const TOKEN_RATES: Record<string, number> = {
   USDC: 1,
   USDS: 1,
+  USDT: 1,
   EURC: 0.95,
   BRZ: 5,
   AUDD: 1.6,
@@ -69,11 +66,6 @@ interface TokenPaymentEntry {
   balance: string;
 }
 
-const publicClient = createPublicClient({
-  chain: BASE_SEPOLIA,
-  transport: http(BASE_SEPOLIA.rpcUrls.default.http[0]),
-});
-
 export default function QrisPaymentPopup({
   recipient,
   merchantName,
@@ -82,10 +74,22 @@ export default function QrisPaymentPopup({
   qrisHash,
   onCancel,
 }: QrisPaymentPopupProps) {
+  const { config } = useActiveChain();
+  const currencies = useMemo(() => buildCurrencies(config), [config]);
+
+  const publicClient = useMemo(
+    () =>
+      createPublicClient({
+        chain: config.chain,
+        transport: http(config.rpcUrl),
+      }),
+    [config],
+  );
+
   // Find IDRX as default target currency
   const idrxCurrency = useMemo(
     () => currencies.find((c) => c.symbol === "IDRX") || currencies[0],
-    [],
+    [currencies],
   );
 
   // Target amount in merchant's currency
@@ -172,7 +176,7 @@ export default function QrisPaymentPopup({
     };
 
     fetchBalances();
-  }, [smartAccountAddress]);
+  }, [smartAccountAddress, currencies, publicClient]);
 
   // Payment mode detection
   const paymentMode = useMemo(() => {
@@ -386,7 +390,7 @@ export default function QrisPaymentPopup({
             // Get swap quote from StableSwap
             try {
               const [amountOut] = (await publicClient.readContract({
-                address: STABLE_SWAP_ADDRESS,
+                address: config.stableSwapAddress,
                 abi: STABLE_SWAP_ABI,
                 functionName: "getSwapQuote",
                 args: [
@@ -399,7 +403,7 @@ export default function QrisPaymentPopup({
             } catch {
               // Fallback to registry conversion
               const converted = (await publicClient.readContract({
-                address: STABLECOIN_REGISTRY_ADDRESS,
+                address: config.stablecoinRegistryAddress,
                 abi: STABLECOIN_REGISTRY_ABI,
                 functionName: "convert",
                 args: [
@@ -488,7 +492,7 @@ export default function QrisPaymentPopup({
 
         // Get swap quote for min amount out
         const [amountOut, , totalUserPays] = (await publicClient.readContract({
-          address: STABLE_SWAP_ADDRESS,
+          address: config.stableSwapAddress,
           abi: STABLE_SWAP_ABI,
           functionName: "getSwapQuote",
           args: [
@@ -503,7 +507,7 @@ export default function QrisPaymentPopup({
           address: entry.currency.tokenAddress as Address,
           abi: ERC20_ABI,
           functionName: "allowance",
-          args: [smartAccountAddress, STABLE_SWAP_ADDRESS],
+          args: [smartAccountAddress, config.stableSwapAddress],
         })) as bigint;
 
         const result = await swapAndTransfer({
@@ -513,7 +517,7 @@ export default function QrisPaymentPopup({
           tokenInDecimals: entry.currency.decimals,
           tokenOutDecimals: targetCurrency.decimals,
           recipient: recipient as Address,
-          stableSwapAddress: STABLE_SWAP_ADDRESS,
+          stableSwapAddress: config.stableSwapAddress,
           minAmountOut: amountOut,
           totalUserPays,
           currentAllowance,
@@ -567,7 +571,7 @@ export default function QrisPaymentPopup({
           if (needsSwap) {
             // Get swap quote
             const [amountOut] = (await publicClient.readContract({
-              address: STABLE_SWAP_ADDRESS,
+              address: config.stableSwapAddress,
               abi: STABLE_SWAP_ABI,
               functionName: "getSwapQuote",
               args: [
@@ -609,7 +613,7 @@ export default function QrisPaymentPopup({
           targetTokenDecimals: targetCurrency.decimals,
           recipient: recipient as Address,
           totalAmountOut,
-          stableSwapAddress: STABLE_SWAP_ADDRESS,
+          stableSwapAddress: config.stableSwapAddress,
         });
 
         txHash = result.txHash;

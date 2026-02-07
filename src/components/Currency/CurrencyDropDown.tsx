@@ -1,17 +1,20 @@
 "use client";
 
-import { useState, useRef, useEffect } from 'react';
+import { useState, useRef, useEffect, useMemo } from 'react';
 import { ChevronDown } from 'lucide-react';
 import Image from 'next/image';
-import { Currency, currencies } from './currencies';
+import { Currency, buildCurrencies } from './currencies';
+import { useActiveChain } from '@/hooks/useActiveChain';
 
 interface CurrencyDropdownProps {
   value: Currency;
   onChange: (currency: Currency) => void;
 }
 export default function CurrencyDropdown({ value, onChange }: CurrencyDropdownProps) {
+  const { config } = useActiveChain();
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const currencies = useMemo(() => buildCurrencies(config), [config]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {

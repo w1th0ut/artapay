@@ -1,24 +1,21 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import Image from "next/image";
 import { Eye, EyeOff, ChevronDown, Loader2 } from "lucide-react";
 import { useSmartAccount } from "@/hooks/useSmartAccount";
-import { TOKENS } from "@/config/constants";
-import { BASE_SEPOLIA } from "@/config/chains";
+import { useActiveChain } from "@/hooks/useActiveChain";
 import { createPublicClient, http, formatUnits, type Address } from "viem";
 import { ERC20_ABI } from "@/config/abi";
 import Modal from "@/components/Modal";
-
-const publicClient = createPublicClient({
-  chain: BASE_SEPOLIA,
-  transport: http(BASE_SEPOLIA.rpcUrls.default.http[0]),
-});
+import { isNoDataContractError, isRateLimitError } from "@/lib/viem-errors";
 
 type TokenBalances = { [symbol: string]: string };
 
 export default function BalanceDisplay() {
   const { smartAccountAddress } = useSmartAccount();
+  const { config } = useActiveChain();
+  const tokens = config.tokens;
   const [selectedTokenIndex, setSelectedTokenIndex] = useState(0);
   const [balances, setBalances] = useState<TokenBalances>({});
   const [isHidden, setIsHidden] = useState(false);
@@ -34,7 +31,30 @@ export default function BalanceDisplay() {
     onRetry?: () => void;
   }>({ isOpen: false, title: "", message: "" });
 
-  const selectedToken = TOKENS[selectedTokenIndex];
+  const selectedToken = tokens[selectedTokenIndex];
+
+  const publicClient = useMemo(
+    () =>
+      createPublicClient({
+        chain: config.chain,
+        transport: http(config.rpcUrl),
+      }),
+    [config],
+  );
+
+  useEffect(() => {
+    if (tokens.length === 0) return;
+    const defaultIndex = Math.max(
+      tokens.findIndex(
+        (token) =>
+          token.symbol.toLowerCase() ===
+          config.defaultTokenSymbol.toLowerCase(),
+      ),
+      0,
+    );
+    setSelectedTokenIndex(defaultIndex);
+    setBalances({});
+  }, [config.defaultTokenSymbol, tokens]);
 
   // Fetch all balances when address changes or dropdown opens
   const fetchAllBalances = async () => {
@@ -45,7 +65,7 @@ export default function BalanceDisplay() {
 
     try {
       await Promise.all(
-        TOKENS.map(async (token) => {
+        tokens.map(async (token) => {
           try {
             const rawBalance = await publicClient.readContract({
               address: token.address as Address,
@@ -92,6 +112,9 @@ export default function BalanceDisplay() {
     } catch (err) {
       console.error("Failed to fetch balance:", err);
       setBalances((prev) => ({ ...prev, [selectedToken.symbol]: "0" }));
+      if (isNoDataContractError(err) || isRateLimitError(err)) {
+        return;
+      }
       setErrorModal({
         isOpen: true,
         title: "Balance Error",
@@ -103,7 +126,7 @@ export default function BalanceDisplay() {
     } finally {
       setIsLoading(false);
     }
-  }, [smartAccountAddress, selectedToken]);
+  }, [smartAccountAddress, selectedToken, publicClient]);
 
   // Fetch selected token balance on mount and when token changes
   useEffect(() => {
@@ -205,7 +228,7 @@ export default function BalanceDisplay() {
                 Loading balances...
               </div>
             )}
-            {TOKENS.map((token, index) => (
+            {tokens.map((token, index) => (
               <button
                 key={token.symbol}
                 onClick={() => handleTokenSelect(index)}

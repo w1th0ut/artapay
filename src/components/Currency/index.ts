@@ -1,3 +1,3 @@
 export { default as CurrencyDropdown } from './CurrencyDropDown';
-export { currencies } from './currencies';
+export { buildCurrencies } from './currencies';
 export type { Currency } from './currencies';

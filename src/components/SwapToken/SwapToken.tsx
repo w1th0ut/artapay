@@ -1,28 +1,25 @@
 "use client";
 
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import { ArrowUpDown, Loader2, AlertTriangle } from "lucide-react";
-import { Currency, currencies } from "@/components/Currency";
+import { Currency, buildCurrencies } from "@/components/Currency";
 import CurrencyBadge from "./CurrencyBadge";
 import CurrencyModal from "./CurrencyModal";
 import { useSmartAccount } from "@/hooks/useSmartAccount";
 import { fetchSwapQuote, SwapQuoteResponse } from "@/api/swapApi";
-import { STABLE_SWAP_ADDRESS } from "@/config/constants";
 import { parseUnits, formatUnits, type Address } from "viem";
-import { BASE_SEPOLIA } from "@/config/chains";
 import { createPublicClient, http } from "viem";
 import { ERC20_ABI } from "@/config/abi";
 import { ReceiptPopUp, ReceiptData } from "@/components/ReceiptPopUp";
 import Modal from "@/components/Modal";
-
-const publicClient = createPublicClient({
-  chain: BASE_SEPOLIA,
-  transport: http(BASE_SEPOLIA.rpcUrls.default.http[0]),
-});
+import { useActiveChain } from "@/hooks/useActiveChain";
+import { isNoDataContractError, isRateLimitError } from "@/lib/viem-errors";
 
 export default function SwapToken() {
-  const [fromCurrency, setFromCurrency] = useState<Currency>(currencies[0]); // USDC
-  const [toCurrency, setToCurrency] = useState<Currency>(currencies[2]); // IDRX
+  const { config } = useActiveChain();
+  const currencies = useMemo(() => buildCurrencies(config), [config]);
+  const [fromCurrency, setFromCurrency] = useState<Currency>(currencies[0]!); // default
+  const [toCurrency, setToCurrency] = useState<Currency>(currencies[1] ?? currencies[0]!); // fallback
   const [amount, setAmount] = useState<string>("");
   const [swapQuote, setSwapQuote] = useState<SwapQuoteResponse | null>(null);
   const [isCalculating, setIsCalculating] = useState(false);
@@ -49,6 +46,31 @@ export default function SwapToken() {
   const { smartAccountAddress, swapTokens, isLoading, isReady, status, error } =
     useSmartAccount();
 
+  const publicClient = useMemo(
+    () =>
+      createPublicClient({
+        chain: config.chain,
+        transport: http(config.rpcUrl),
+      }),
+    [config],
+  );
+
+  useEffect(() => {
+    if (!currencies.length) return;
+    const defaultFrom =
+      currencies.find(
+        (token) =>
+          token.symbol.toLowerCase() ===
+          config.defaultTokenSymbol.toLowerCase(),
+      ) ?? currencies[0];
+    const defaultTo =
+      currencies.find((token) => token.symbol !== defaultFrom.symbol) ||
+      currencies[0];
+    setFromCurrency(defaultFrom);
+    setToCurrency(defaultTo);
+    setSwapQuote(null);
+  }, [config.defaultTokenSymbol, currencies]);
+
   const fetchBalance = useCallback(async () => {
     if (!smartAccountAddress) {
       setBalance("0");
@@ -67,6 +89,9 @@ export default function SwapToken() {
     } catch (err) {
       console.error("Failed to fetch balance:", err);
       setBalance("0");
+      if (isNoDataContractError(err) || isRateLimitError(err)) {
+        return;
+      }
       setErrorModal({
         isOpen: true,
         title: "Balance Error",
@@ -76,7 +101,7 @@ export default function SwapToken() {
     } finally {
       setIsLoadingBalance(false);
     }
-  }, [smartAccountAddress, fromCurrency]);
+  }, [smartAccountAddress, fromCurrency, publicClient]);
 
   // Fetch balance of fromCurrency
   useEffect(() => {
@@ -122,6 +147,7 @@ export default function SwapToken() {
           tokenIn: fromCurrency.tokenAddress,
           tokenOut: toCurrency.tokenAddress,
           amountIn,
+          chainId: config.chain.id,
         });
         setSwapQuote(quote);
         setQuoteError(null);
@@ -159,7 +185,7 @@ export default function SwapToken() {
         tokenOut: toCurrency.tokenAddress as `0x${string}`,
         amount,
         tokenInDecimals: fromCurrency.decimals,
-        stableSwapAddress: STABLE_SWAP_ADDRESS,
+        stableSwapAddress: config.stableSwapAddress,
         minAmountOut,
         totalUserPays: BigInt(swapQuote.totalUserPays),
       });

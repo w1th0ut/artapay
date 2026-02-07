@@ -5,7 +5,8 @@ import { ChevronDown, Loader2, RefreshCw, ExternalLink } from "lucide-react";
 import Image from "next/image";
 import { useSmartAccount } from "@/hooks/useSmartAccount";
 import Modal from "@/components/Modal";
-import { Currency, currencies } from "@/components/Currency";
+import { Currency, buildCurrencies } from "@/components/Currency";
+import { useActiveChain } from "@/hooks/useActiveChain";
 import {
   createPublicClient,
   formatUnits,
@@ -13,8 +14,6 @@ import {
   parseUnits,
   type Address,
 } from "viem";
-import { BASE_SEPOLIA } from "@/config/chains";
-import { STABLECOIN_REGISTRY_ADDRESS } from "@/config/constants";
 import { STABLECOIN_REGISTRY_ABI } from "@/config/abi";
 
 interface IdRxTransaction {
@@ -27,6 +26,7 @@ interface IdRxTransaction {
 }
 
 export default function TopUpIDRX() {
+  const { config } = useActiveChain();
   const { smartAccountAddress, isReady } = useSmartAccount();
 
   const TOPUP_LIMITS: Record<string, { min: number; max: number }> = {
@@ -38,22 +38,23 @@ export default function TopUpIDRX() {
   const publicClient = useMemo(
     () =>
       createPublicClient({
-        chain: BASE_SEPOLIA,
-        transport: http(BASE_SEPOLIA.rpcUrls.default.http[0]),
+        chain: config.chain,
+        transport: http(config.rpcUrl),
       }),
-    [],
+    [config],
   );
 
+  const currencies = useMemo(() => buildCurrencies(config), [config]);
   const topUpTokens = useMemo(
     () =>
       currencies.filter(
         (token) => token.symbol === "IDRX" || token.symbol === "USDC",
       ),
-    [],
+    [currencies],
   );
-  const defaultToken =
-    topUpTokens.find((token) => token.symbol === "IDRX") || topUpTokens[0];
-  const [topUpToken, setTopUpToken] = useState<Currency>(defaultToken);
+  const [topUpToken, setTopUpToken] = useState<Currency | null>(
+    topUpTokens[0] || null,
+  );
   const [isTokenMenuOpen, setIsTokenMenuOpen] = useState(false);
   const tokenMenuRef = useRef<HTMLDivElement>(null);
 
@@ -83,10 +84,16 @@ export default function TopUpIDRX() {
   }, [amount]);
   const numericAmount = Number(amount);
   const hasValidAmount = Number.isFinite(numericAmount) && numericAmount > 0;
-  const limits = TOPUP_LIMITS[topUpToken.symbol] || TOPUP_LIMITS.IDRX;
+  const activeToken = topUpToken || topUpTokens[0];
+  const limits =
+    TOPUP_LIMITS[activeToken?.symbol || "IDRX"] || TOPUP_LIMITS.IDRX;
   const isBelowMin = hasValidAmount && numericAmount < limits.min;
   const isAboveMax = hasValidAmount && numericAmount > limits.max;
   const isOutOfRange = isBelowMin || isAboveMax;
+
+  if (!activeToken) {
+    return null;
+  }
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -105,6 +112,13 @@ export default function TopUpIDRX() {
     setPaymentUrl(null);
     setReference(null);
   }, [topUpToken]);
+
+  useEffect(() => {
+    if (!topUpTokens.length) return;
+    const defaultToken =
+      topUpTokens.find((token) => token.symbol === "IDRX") || topUpTokens[0];
+    setTopUpToken(defaultToken);
+  }, [topUpTokens]);
 
   const openConfirmModal = () => {
     setIsConfirmChecked(false);
@@ -128,7 +142,7 @@ export default function TopUpIDRX() {
       setIsLoadingHistory(true);
       try {
         const response = await fetch(
-          `/api/idrx/transaction-history?transactionType=MINT&walletAddress=${smartAccountAddress}&page=${page}&take=${HISTORY_TAKE}&requestType=idrx`,
+          `/api/idrx/transaction-history?transactionType=MINT&walletAddress=${smartAccountAddress}&page=${page}&take=${HISTORY_TAKE}&requestType=idrx&chain=${config.key}`,
         );
         if (!response.ok) {
           throw new Error("Failed to fetch transaction history.");
@@ -153,7 +167,7 @@ export default function TopUpIDRX() {
         setIsLoadingHistory(false);
       }
     },
-    [smartAccountAddress],
+    [smartAccountAddress, config.key],
   );
 
   useEffect(() => {
@@ -179,7 +193,7 @@ export default function TopUpIDRX() {
       setErrorModal({
         isOpen: true,
         title: "Amount Out of Range",
-        message: `Allowed range: ${limits.min.toLocaleString()} - ${limits.max.toLocaleString()} ${topUpToken.symbol}.`,
+        message: `Allowed range: ${limits.min.toLocaleString()} - ${limits.max.toLocaleString()} ${activeToken.symbol}.`,
       });
       return;
     }
@@ -187,18 +201,21 @@ export default function TopUpIDRX() {
     setIsSubmitting(true);
     try {
       let amountToMint = amount;
-      if (topUpToken.symbol === "USDC") {
+      if (!activeToken) {
+        throw new Error("Token configuration is missing.");
+      }
+      if (activeToken.symbol === "USDC") {
         const idrxToken = currencies.find((token) => token.symbol === "IDRX");
         if (!idrxToken) {
           throw new Error("IDRX token configuration is missing.");
         }
-        const amountRaw = parseUnits(amount, topUpToken.decimals);
+        const amountRaw = parseUnits(amount, activeToken.decimals);
         const converted = (await publicClient.readContract({
-          address: STABLECOIN_REGISTRY_ADDRESS,
+          address: config.stablecoinRegistryAddress,
           abi: STABLECOIN_REGISTRY_ABI,
           functionName: "convert",
           args: [
-            topUpToken.tokenAddress as Address,
+            activeToken.tokenAddress as Address,
             idrxToken.tokenAddress as Address,
             amountRaw,
           ],
@@ -212,7 +229,8 @@ export default function TopUpIDRX() {
         body: JSON.stringify({
           amount: amountToMint,
           walletAddress: smartAccountAddress,
-          token: topUpToken.symbol.toLowerCase(),
+          token: activeToken.symbol.toLowerCase(),
+          chain: config.key,
         }),
       });
       const result = await response.json();
@@ -258,16 +276,16 @@ export default function TopUpIDRX() {
             <div className="flex items-center gap-3">
               <div className="w-8 h-8 sm:w-10 sm:h-10 rounded-full bg-zinc-700 flex items-center justify-center overflow-hidden">
                 <Image
-                  src={topUpToken.icon}
-                  alt={topUpToken.name}
+                  src={activeToken.icon}
+                  alt={activeToken.name}
                   width={40}
                   height={40}
                   className="object-cover"
                 />
               </div>
               <div className="text-left">
-                <p className="text-white font-medium">{topUpToken.name}</p>
-                <p className="text-zinc-400 text-sm">{topUpToken.symbol}</p>
+                <p className="text-white font-medium">{activeToken.name}</p>
+                <p className="text-zinc-400 text-sm">{activeToken.symbol}</p>
               </div>
             </div>
             <ChevronDown
@@ -288,7 +306,7 @@ export default function TopUpIDRX() {
                     setIsTokenMenuOpen(false);
                   }}
                   className={`w-full flex items-center gap-3 p-4 hover:bg-zinc-700 transition-colors cursor-pointer ${
-                    topUpToken.id === token.id ? "bg-zinc-700" : ""
+                    topUpToken?.id === token.id ? "bg-zinc-700" : ""
                   }`}
                 >
                   <div className="w-10 h-10 rounded-full bg-zinc-600 flex items-center justify-center overflow-hidden">
@@ -313,7 +331,7 @@ export default function TopUpIDRX() {
 
       <div className="space-y-2">
         <label className="text-zinc-400 text-sm">
-          Top Up Amount ({topUpToken.symbol})
+          Top Up Amount ({activeToken.symbol})
         </label>
         <input
           type="text"
@@ -325,17 +343,17 @@ export default function TopUpIDRX() {
         />
         {amount && (
           <div className="text-xs text-zinc-400">
-            {formattedAmount} {topUpToken.symbol}
+            {formattedAmount} {activeToken.symbol}
           </div>
         )}
         {isBelowMin && (
           <div className="text-xs text-orange-400">
-            Below minimum: {limits.min.toLocaleString()} {topUpToken.symbol}
+            Below minimum: {limits.min.toLocaleString()} {activeToken.symbol}
           </div>
         )}
         {isAboveMax && (
           <div className="text-xs text-orange-400">
-            Above maximum: {limits.max.toLocaleString()} {topUpToken.symbol}
+            Above maximum: {limits.max.toLocaleString()} {activeToken.symbol}
           </div>
         )}
       </div>

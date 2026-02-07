@@ -2,12 +2,11 @@
 
 import { useState, useCallback, useEffect, useMemo } from "react";
 import { AlertTriangle, Plus, Trash2 } from "lucide-react";
-import { CurrencyDropdown, Currency, currencies } from "@/components/Currency";
+import { CurrencyDropdown, Currency, buildCurrencies } from "@/components/Currency";
 import Modal from "@/components/Modal";
 import { ReceiptPopUp, ReceiptData } from "@/components/ReceiptPopUp";
 import { useSmartAccount } from "@/hooks/useSmartAccount";
-import { BASE_SEPOLIA } from "@/config/chains";
-import { env } from "@/config/env";
+import { useActiveChain } from "@/hooks/useActiveChain";
 import {
   createPublicClient,
   http,
@@ -18,17 +17,7 @@ import {
 } from "viem";
 import { mainnet } from "viem/chains";
 import { ERC20_ABI } from "@/config/abi";
-
-const publicClient = createPublicClient({
-  chain: BASE_SEPOLIA,
-  transport: http(BASE_SEPOLIA.rpcUrls.default.http[0]),
-});
-
-const ensPublicClient = createPublicClient({
-  chain: mainnet,
-  transport: env.mainnetRpcUrl ? http(env.mainnetRpcUrl) : http(),
-  ccipRead: {},
-});
+import { isNoDataContractError, isRateLimitError } from "@/lib/viem-errors";
 
 const isEnsName = (value: string) => {
   const trimmed = value.trim();
@@ -37,7 +26,10 @@ const isEnsName = (value: string) => {
   );
 };
 
-const resolveRecipientAddress = async (value: string): Promise<Address> => {
+const resolveRecipientAddress = async (
+  value: string,
+  ensClient: ReturnType<typeof createPublicClient>,
+): Promise<Address> => {
   const trimmed = value.trim();
   if (isAddress(trimmed)) {
     return getAddress(trimmed) as Address;
@@ -45,7 +37,7 @@ const resolveRecipientAddress = async (value: string): Promise<Address> => {
   if (!isEnsName(trimmed)) {
     throw new Error("Invalid address or ENS name");
   }
-  const resolved = await ensPublicClient.getEnsAddress({
+  const resolved = await ensClient.getEnsAddress({
     name: trimmed.toLowerCase(),
     gatewayUrls: ["https://ccip-v3.ens.xyz"],
   });
@@ -74,7 +66,9 @@ interface BatchRecipient {
 export default function InputAddressContent({
   onSend,
 }: InputAddressContentProps) {
-  const [currency, setCurrency] = useState<Currency>(currencies[0]);
+  const { config } = useActiveChain();
+  const currencies = useMemo(() => buildCurrencies(config), [config]);
+  const [currency, setCurrency] = useState<Currency>(currencies[0]!);
   const [address, setAddress] = useState("");
   const [amountInput, setAmountInput] = useState<string>("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -106,6 +100,36 @@ export default function InputAddressContent({
     status,
   } = useSmartAccount();
 
+  const publicClient = useMemo(
+    () =>
+      createPublicClient({
+        chain: config.chain,
+        transport: http(config.rpcUrl),
+      }),
+    [config],
+  );
+
+  const ensPublicClient = useMemo(
+    () =>
+      createPublicClient({
+        chain: mainnet,
+        transport: config.mainnetRpcUrl ? http(config.mainnetRpcUrl) : http(),
+        ccipRead: {},
+      }),
+    [config.mainnetRpcUrl],
+  );
+
+  useEffect(() => {
+    if (currencies.length === 0) return;
+    const defaultCurrency =
+      currencies.find(
+        (token) =>
+          token.symbol.toLowerCase() ===
+          config.defaultTokenSymbol.toLowerCase(),
+      ) ?? currencies[0];
+    setCurrency(defaultCurrency);
+  }, [config.defaultTokenSymbol, currencies]);
+
   const fetchBalance = useCallback(async () => {
     if (!smartAccountAddress) {
       setBalance("0");
@@ -124,6 +148,9 @@ export default function InputAddressContent({
     } catch (err) {
       console.error("Failed to fetch balance:", err);
       setBalance("0");
+      if (isNoDataContractError(err) || isRateLimitError(err)) {
+        return;
+      }
       setErrorModal({
         isOpen: true,
         title: "Balance Error",
@@ -133,7 +160,7 @@ export default function InputAddressContent({
     } finally {
       setIsLoadingBalance(false);
     }
-  }, [smartAccountAddress, currency]);
+  }, [smartAccountAddress, currency, publicClient]);
 
   // Fetch balance when currency or address changes
   useEffect(() => {
@@ -268,7 +295,7 @@ export default function InputAddressContent({
 
       let recipient: Address;
       try {
-        recipient = await resolveRecipientAddress(address);
+        recipient = await resolveRecipientAddress(address, ensPublicClient);
       } catch (err) {
         setErrorModal({
           isOpen: true,
@@ -379,7 +406,10 @@ export default function InputAddressContent({
         const resolvedRecipients = await Promise.all(
           recipientInputs.map(async (r) => {
             try {
-              const resolvedAddress = await resolveRecipientAddress(r.address);
+              const resolvedAddress = await resolveRecipientAddress(
+                r.address,
+                ensPublicClient,
+              );
               return { ...r, resolvedAddress };
             } catch (err) {
               const message =
@@ -653,7 +683,7 @@ export default function InputAddressContent({
                   Validation Errors:
                 </div>
                 {batchValidationErrors.map((err, idx) => (
-                  <div key={idx}>• {err}</div>
+                  <div key={idx}>- {err}</div>
                 ))}
               </div>
             )}

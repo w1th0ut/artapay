@@ -15,10 +15,12 @@ export async function fetchSwapQuote(params: {
   tokenIn: string;
   tokenOut: string;
   amountIn: bigint;
+  chainId?: number;
 }): Promise<SwapQuoteResponse> {
+  const chainQuery = params.chainId ? `&chainId=${params.chainId}` : "";
   const url = `${API_URL}/swap/quote?tokenIn=${params.tokenIn}&tokenOut=${
     params.tokenOut
-  }&amountIn=${params.amountIn.toString()}`;
+  }&amountIn=${params.amountIn.toString()}${chainQuery}`;
   const res = await fetch(url);
   if (!res.ok) {
     const err = await res.json().catch(() => ({ message: "quote failed" }));
@@ -32,6 +34,7 @@ export async function buildSwapCalldata(params: {
   tokenOut: string;
   amountIn: bigint;
   minAmountOut: bigint;
+  chainId?: number;
 }): Promise<{ to: string; data: string; value: string }> {
   const res = await fetch(`${API_URL}/swap/build`, {
     method: "POST",
@@ -41,6 +44,7 @@ export async function buildSwapCalldata(params: {
       tokenOut: params.tokenOut,
       amountIn: params.amountIn.toString(),
       minAmountOut: params.minAmountOut.toString(),
+      ...(params.chainId ? { chainId: params.chainId } : {}),
     }),
   });
 

@@ -11,12 +11,8 @@ import {
   Zap,
 } from "lucide-react";
 import { useSmartAccount } from "@/hooks/useSmartAccount";
-import { currencies, Currency } from "@/components/Currency";
+import { buildCurrencies, Currency } from "@/components/Currency";
 import { CurrencyDropdown } from "@/components/Currency";
-import {
-  PAYMENT_PROCESSOR_ADDRESS,
-  STABLECOIN_REGISTRY_ADDRESS,
-} from "@/config/constants";
 import {
   createPublicClient,
   http,
@@ -24,19 +20,21 @@ import {
   parseUnits,
   type Address,
 } from "viem";
-import { BASE_SEPOLIA } from "@/config/chains";
 import {
   PAYMENT_PROCESSOR_ABI,
   ERC20_ABI,
   STABLECOIN_REGISTRY_ABI,
 } from "@/config/abi";
+import { isNoDataContractError, isRateLimitError } from "@/lib/viem-errors";
 import Modal from "@/components/Modal";
 import { ReceiptPopUp, ReceiptData } from "@/components/ReceiptPopUp";
+import { useActiveChain } from "@/hooks/useActiveChain";
 
 // Token rates: how many tokens equal 1 USD
 const TOKEN_RATES: Record<string, number> = {
   USDC: 1,
   USDS: 1,
+  USDT: 1,
   EURC: 0.95,
   BRZ: 5,
   AUDD: 1.6,
@@ -93,7 +91,9 @@ export default function TransactionPopup({
   payload,
   onCancel,
 }: TransactionPopupProps) {
-  const [payToken, setPayToken] = useState<Currency>(currencies[0]);
+  const { config } = useActiveChain();
+  const currencies = useMemo(() => buildCurrencies(config), [config]);
+  const [payToken, setPayToken] = useState<Currency>(currencies[0]!);
   const [quote, setQuote] = useState<PaymentQuote | null>(null);
   const [isLoadingQuote, setIsLoadingQuote] = useState(false);
   const [quoteError, setQuoteError] = useState<string | null>(null);
@@ -115,7 +115,7 @@ export default function TransactionPopup({
   // Multi-token mode state
   const [isMultiMode, setIsMultiMode] = useState(false);
   const [multiPayments, setMultiPayments] = useState<TokenPaymentEntry[]>([
-    { id: "1", currency: currencies[0], amount: "", balance: "0" },
+    { id: "1", currency: currencies[0]!, amount: "", balance: "0" },
   ]);
   const [multiBalances, setMultiBalances] = useState<Record<string, string>>(
     {},
@@ -151,16 +151,28 @@ export default function TransactionPopup({
   const publicClient = useMemo(
     () =>
       createPublicClient({
-        chain: BASE_SEPOLIA,
-        transport: http(BASE_SEPOLIA.rpcUrls.default.http[0]),
+        chain: config.chain,
+        transport: http(config.rpcUrl),
       }),
-    [],
+    [config],
   );
+
+  useEffect(() => {
+    if (!currencies.length) return;
+    const defaultToken =
+      currencies.find(
+        (token) =>
+          token.symbol.toLowerCase() ===
+          config.defaultTokenSymbol.toLowerCase(),
+      ) ?? currencies[0];
+    setPayToken(defaultToken);
+    setMultiPayments([{ id: "1", currency: defaultToken, amount: "", balance: "0" }]);
+  }, [config.defaultTokenSymbol, currencies]);
 
   const processorAddress =
     payload.processor && payload.processor !== "0x0"
       ? (payload.processor as `0x${string}`)
-      : (PAYMENT_PROCESSOR_ADDRESS as `0x${string}`);
+      : (config.paymentProcessorAddress as `0x${string}`);
 
   // Find requested currency
   const requestedCurrency = currencies.find(
@@ -259,6 +271,9 @@ export default function TransactionPopup({
       } catch (err) {
         console.error("Failed to fetch balance:", err);
         setBalance("0");
+        if (isNoDataContractError(err) || isRateLimitError(err)) {
+          return;
+        }
         setErrorModal({
           isOpen: true,
           title: "Balance Error",
@@ -482,7 +497,7 @@ export default function TransactionPopup({
           } else {
             // Convert via StablecoinRegistry
             const converted = (await publicClient.readContract({
-              address: STABLECOIN_REGISTRY_ADDRESS,
+              address: config.stablecoinRegistryAddress,
               abi: STABLECOIN_REGISTRY_ABI,
               functionName: "convert",
               args: [

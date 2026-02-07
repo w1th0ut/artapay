@@ -5,8 +5,7 @@ import OpenCamera from "./OpenCamera";
 import ImportFromGallery from "./ImportFromGallery";
 import TransactionPopup from "./TransactionPopup";
 import QrisPaymentPopup from "./QrisPaymentPopup";
-import { PAYMENT_PROCESSOR_ADDRESS, QRIS_REGISTRY_ADDRESS } from "@/config/constants";
-import { BASE_SEPOLIA } from "@/config/chains";
+import { useActiveChain } from "@/hooks/useActiveChain";
 import { ReceiptPopUp, ReceiptData } from "@/components/ReceiptPopUp";
 import Modal from "@/components/Modal";
 import { parseQrisPayload } from "@/lib/qris";
@@ -44,13 +43,14 @@ interface QRCodeProps {
 }
 
 export default function QRCode({ onScanResult, disabled }: QRCodeProps) {
+  const { config } = useActiveChain();
   const publicClient = useMemo(
     () =>
       createPublicClient({
-        chain: BASE_SEPOLIA,
-        transport: http(BASE_SEPOLIA.rpcUrls.default.http[0]),
+        chain: config.chain,
+        transport: http(config.rpcUrl),
       }),
-    [],
+    [config],
   );
   const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
   const [isCameraOpen, setIsCameraOpen] = useState(false);
@@ -94,9 +94,9 @@ export default function QRCode({ onScanResult, disabled }: QRCodeProps) {
           throw new Error("QR data incomplete");
         }
 
-        if (data.chainId !== BASE_SEPOLIA.id) {
+        if (data.chainId !== config.chain.id) {
           throw new Error(
-            `Wrong network. Expected Base Sepolia (${BASE_SEPOLIA.id})`,
+            `Wrong network. Expected ${config.chain.name} (${config.chain.id})`,
           );
         }
 
@@ -109,7 +109,7 @@ export default function QRCode({ onScanResult, disabled }: QRCodeProps) {
 
         const payload: PaymentRequestPayload = {
           version: data.version,
-          processor: data.processor || PAYMENT_PROCESSOR_ADDRESS,
+          processor: data.processor || config.paymentProcessorAddress,
           chainId: data.chainId,
           request: {
             recipient: data.request.recipient,
@@ -134,7 +134,7 @@ export default function QRCode({ onScanResult, disabled }: QRCodeProps) {
     try {
       const parsed = parseQrisPayload(result);
       const info = (await publicClient.readContract({
-        address: QRIS_REGISTRY_ADDRESS,
+        address: config.qrisRegistryAddress,
         abi: QRIS_REGISTRY_ABI,
         functionName: "getQris",
         args: [parsed.hash],

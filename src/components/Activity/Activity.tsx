@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { Loader2, RefreshCw } from "lucide-react";
 import ActivityItem from "./ActivityItem";
 import { ActivityData, GroupedActivities } from "./types";
@@ -9,6 +9,7 @@ import {
   groupActivitiesByPeriod,
 } from "./GetActivityHistory";
 import { useSmartAccount } from "@/hooks/useSmartAccount";
+import { useActiveChain } from "@/hooks/useActiveChain";
 import Modal from "@/components/Modal";
 
 export default function Activity() {
@@ -27,8 +28,9 @@ export default function Activity() {
   }>({ isOpen: false, title: "", message: "" });
 
   const { smartAccountAddress, isReady } = useSmartAccount();
+  const { config } = useActiveChain();
 
-  const loadActivities = async () => {
+  const loadActivities = useCallback(async () => {
     if (!smartAccountAddress) {
       setGroupedActivities([]);
       setIsLoading(false);
@@ -38,7 +40,10 @@ export default function Activity() {
     try {
       setIsLoading(true);
       setError(null);
-      const activities = await fetchActivityHistory(smartAccountAddress);
+      const activities = await fetchActivityHistory(
+        smartAccountAddress,
+        config
+      );
       const grouped = groupActivitiesByPeriod(activities);
       setGroupedActivities(grouped);
     } catch (err) {
@@ -53,11 +58,11 @@ export default function Activity() {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [smartAccountAddress, config]);
 
   useEffect(() => {
     loadActivities();
-  }, [smartAccountAddress]);
+  }, [loadActivities]);
 
   // Show connect wallet message if not connected
   if (isReady && !smartAccountAddress) {

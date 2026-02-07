@@ -2,7 +2,9 @@
 
 import Image from "next/image";
 import { X } from "lucide-react";
-import { Currency, currencies } from "@/components/Currency";
+import { useMemo } from "react";
+import { Currency, buildCurrencies } from "@/components/Currency";
+import { useActiveChain } from "@/hooks/useActiveChain";
 
 interface CurrencyModalProps {
   isOpen: boolean;
@@ -18,6 +20,8 @@ export default function CurrencyModal({
   excludeCurrency,
 }: CurrencyModalProps) {
   if (!isOpen) return null;
+  const { config } = useActiveChain();
+  const currencies = useMemo(() => buildCurrencies(config), [config]);
   const availableCurrencies = currencies.filter(
     (c) => c.id !== excludeCurrency?.id
   );

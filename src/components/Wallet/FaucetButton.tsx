@@ -1,18 +1,12 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { Droplet, Loader2 } from "lucide-react";
 import { createPublicClient, http, type Address } from "viem";
 import { useSmartAccount } from "@/hooks/useSmartAccount";
-import { BASE_SEPOLIA } from "@/config/chains";
-import { env } from "@/config/env";
+import { useActiveChain } from "@/hooks/useActiveChain";
 import { FAUCET_ABI } from "@/config/abi";
 import Modal from "@/components/Modal";
-
-const publicClient = createPublicClient({
-  chain: BASE_SEPOLIA,
-  transport: http(BASE_SEPOLIA.rpcUrls.default.http[0]),
-});
 
 const FAUCET_AMOUNT = 10;
 
@@ -28,6 +22,7 @@ const formatCooldown = (seconds: number) => {
 
 export default function FaucetButton() {
   const { smartAccountAddress, claimFaucet, isLoading } = useSmartAccount();
+  const { config } = useActiveChain();
   const [cooldownRemaining, setCooldownRemaining] = useState<number | null>(
     null
   );
@@ -39,10 +34,27 @@ export default function FaucetButton() {
     message: string;
   }>({ isOpen: false, title: "Faucet Error", message: "" });
 
-  const usdcAddress = env.tokenUsdcAddress as Address;
+  const usdcToken = useMemo(
+    () =>
+      config.tokens.find(
+        (token) => token.symbol.toLowerCase() === "usdc"
+      ),
+    [config.tokens]
+  );
+
+  const usdcAddress = usdcToken?.address as Address | undefined;
+
+  const publicClient = useMemo(
+    () =>
+      createPublicClient({
+        chain: config.chain,
+        transport: http(config.rpcUrl),
+      }),
+    [config]
+  );
 
   const refreshCooldown = useCallback(async () => {
-    if (!smartAccountAddress) {
+    if (!smartAccountAddress || !usdcAddress) {
       setCooldownRemaining(null);
       return;
     }
@@ -62,13 +74,13 @@ export default function FaucetButton() {
     } finally {
       setIsChecking(false);
     }
-  }, [smartAccountAddress, usdcAddress]);
+  }, [smartAccountAddress, usdcAddress, publicClient]);
 
   useEffect(() => {
     refreshCooldown();
   }, [refreshCooldown]);
 
-  if (!smartAccountAddress) {
+  if (!smartAccountAddress || !usdcAddress) {
     return null;
   }
 
@@ -78,7 +90,7 @@ export default function FaucetButton() {
     cooldownActive || isLoading || isChecking || isClaiming || !smartAccountAddress;
 
   const handleFaucet = async () => {
-    if (!smartAccountAddress || isDisabled) return;
+    if (!smartAccountAddress || isDisabled || !usdcAddress) return;
     setIsClaiming(true);
     try {
       await claimFaucet({

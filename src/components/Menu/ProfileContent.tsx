@@ -5,10 +5,9 @@ import { createPublicClient, http, type Address } from "viem";
 import { CheckCircle, Loader2 } from "lucide-react";
 import { QRCodeSVG } from "qrcode.react";
 import { useSmartAccount } from "@/hooks/useSmartAccount";
-import { BASE_SEPOLIA } from "@/config/chains";
-import { DEFAULT_TOKEN_SYMBOL, QRIS_REGISTRY_ADDRESS } from "@/config/constants";
+import { useActiveChain } from "@/hooks/useActiveChain";
 import { QRIS_REGISTRY_ABI } from "@/config/abi";
-import { currencies } from "@/components/Currency";
+import { buildCurrencies } from "@/components/Currency";
 import { parseQrisPayload, type QrisParseResult } from "@/lib/qris";
 import Modal from "@/components/Modal";
 import ClosedCamera from "@/components/ScanQRCode/ClosedCamera";
@@ -28,6 +27,7 @@ type QrisInfo = {
 const ZERO_ADDRESS = "0x0000000000000000000000000000000000000000";
 
 export default function ProfileContent() {
+  const { config } = useActiveChain();
   const {
     smartAccountAddress,
     isReady,
@@ -39,14 +39,18 @@ export default function ProfileContent() {
   const publicClient = useMemo(
     () =>
       createPublicClient({
-        chain: BASE_SEPOLIA,
-        transport: http(BASE_SEPOLIA.rpcUrls.default.http[0]),
+        chain: config.chain,
+        transport: http(config.rpcUrl),
       }),
-    [],
+    [config],
   );
 
+  const currencies = useMemo(() => buildCurrencies(config), [config]);
   const defaultGasToken =
-    currencies.find((c) => c.symbol === DEFAULT_TOKEN_SYMBOL) || currencies[0];
+    currencies.find(
+      (c) =>
+        c.symbol.toLowerCase() === config.defaultTokenSymbol.toLowerCase(),
+    ) || currencies[0];
 
   const [isCameraOpen, setIsCameraOpen] = useState(false);
   const [parsedQris, setParsedQris] = useState<QrisParseResult | null>(null);
@@ -107,7 +111,7 @@ export default function ProfileContent() {
     setIsLoadingInfo(true);
     try {
       const info = (await publicClient.readContract({
-        address: QRIS_REGISTRY_ADDRESS,
+        address: config.qrisRegistryAddress,
         abi: QRIS_REGISTRY_ABI,
         functionName: "getQrisBySa",
         args: [smartAccountAddress],
@@ -120,7 +124,7 @@ export default function ProfileContent() {
     } finally {
       setIsLoadingInfo(false);
     }
-  }, [publicClient, smartAccountAddress]);
+  }, [publicClient, smartAccountAddress, config.qrisRegistryAddress]);
 
   useEffect(() => {
     loadRegistryInfo();

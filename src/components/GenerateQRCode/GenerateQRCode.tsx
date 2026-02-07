@@ -1,13 +1,12 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { Loader2 } from "lucide-react";
 import ClosedQRCode from "./ClosedQRCode";
 import GeneratedQRCode from "./GeneratedQRCode";
-import { CurrencyDropdown, Currency, currencies } from "@/components/Currency";
+import { CurrencyDropdown, Currency, buildCurrencies } from "@/components/Currency";
 import { useSmartAccount } from "@/hooks/useSmartAccount";
-import { PAYMENT_PROCESSOR_ADDRESS } from "@/config/constants";
-import { BASE_SEPOLIA } from "@/config/chains";
+import { useActiveChain } from "@/hooks/useActiveChain";
 import { parseUnits, keccak256, encodeAbiParameters, toHex } from "viem";
 import { ReceiptPopUp, ReceiptData } from "@/components/ReceiptPopUp";
 import Modal from "@/components/Modal";
@@ -28,7 +27,9 @@ interface PaymentRequestPayload {
 }
 
 export default function GenerateQRCode() {
-  const [currency, setCurrency] = useState<Currency>(currencies[0]);
+  const { config } = useActiveChain();
+  const currencies = useMemo(() => buildCurrencies(config), [config]);
+  const [currency, setCurrency] = useState<Currency>(currencies[0]!);
   const [amountInput, setAmountInput] = useState<string>("");
   const [generatedPayload, setGeneratedPayload] =
     useState<PaymentRequestPayload | null>(null);
@@ -47,6 +48,17 @@ export default function GenerateQRCode() {
     isReady,
     status,
   } = useSmartAccount();
+
+  useEffect(() => {
+    if (!currencies.length) return;
+    const defaultCurrency =
+      currencies.find(
+        (token) =>
+          token.symbol.toLowerCase() ===
+          config.defaultTokenSymbol.toLowerCase(),
+      ) ?? currencies[0];
+    setCurrency(defaultCurrency);
+  }, [config.defaultTokenSymbol, currencies]);
 
   // Error modal state
   const [errorModal, setErrorModal] = useState<{
@@ -113,8 +125,8 @@ export default function GenerateQRCode() {
             { name: "merchantSigner", type: "address" },
           ],
           [
-            PAYMENT_PROCESSOR_ADDRESS as `0x${string}`,
-            BigInt(BASE_SEPOLIA.id),
+            config.paymentProcessorAddress as `0x${string}`,
+            BigInt(config.chain.id),
             smartAccountAddress,
             currency.tokenAddress as `0x${string}`,
             requestedAmountRaw,
@@ -132,8 +144,8 @@ export default function GenerateQRCode() {
 
       const payload: PaymentRequestPayload = {
         version: "artapay-payment-v2",
-        processor: PAYMENT_PROCESSOR_ADDRESS,
-        chainId: BASE_SEPOLIA.id,
+        processor: config.paymentProcessorAddress,
+        chainId: config.chain.id,
         request: {
           recipient: smartAccountAddress,
           requestedToken: currency.tokenAddress,

@@ -4,8 +4,7 @@ import { useState } from "react";
 import { AlertCircle, Loader2, LogOut } from "lucide-react";
 import { usePrivy } from "@privy-io/react-auth";
 import type { BaseAppDeploymentStatus } from "@/hooks/useSmartAccount";
-import { TOKENS } from "@/config/constants";
-import { BASE_SEPOLIA } from "@/config/chains";
+import { useActiveChain } from "@/hooks/useActiveChain";
 import Modal from "@/components/Modal";
 
 interface ActivationModalProps {
@@ -21,6 +20,8 @@ export default function ActivationModal({
   baseAppDeployment,
   onDeployBase,
 }: ActivationModalProps) {
+  const { config } = useActiveChain();
+  const tokens = config.tokens;
   const [isActivating, setIsActivating] = useState(false);
   const [isDeploying, setIsDeploying] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -105,7 +106,7 @@ export default function ActivationModal({
                 Approve Tokens
               </h3>
               <p className="text-zinc-400 text-xs mt-1">
-                Grant permission for {TOKENS.length} tokens to use gasless
+                Grant permission for {tokens.length} tokens to use gasless
                 features
               </p>
             </div>
@@ -131,10 +132,10 @@ export default function ActivationModal({
           <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 p-3 text-amber-200 text-xs space-y-3">
             <div>
               <div className="text-sm font-semibold">
-                Base App wallet not ready
+                Wallet not ready
               </div>
               <div className="mt-2 text-amber-100">
-                Your Base App wallet needs to be deployed on {BASE_SEPOLIA.name}{" "}
+                Your wallet needs to be deployed on {config.chain.name}{" "}
                 first. Click the button below to automatically deploy it.
               </div>
             </div>
@@ -149,7 +150,7 @@ export default function ActivationModal({
                   DEPLOYING WALLET...
                 </span>
               ) : (
-                "DEPLOY BASE WALLET"
+                "DEPLOY WALLET"
               )}
             </button>
           </div>

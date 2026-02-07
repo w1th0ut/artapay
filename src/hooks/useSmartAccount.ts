@@ -23,15 +23,7 @@ import {
 import { toAccount } from "viem/accounts";
 import { createSmartAccountClient } from "permissionless";
 import { toSimpleSmartAccount } from "permissionless/accounts";
-import { BASE_SEPOLIA } from "@/config/chains";
-import {
-  ENTRY_POINT_ADDRESS,
-  PIMLICO_BUNDLER_URL,
-  PAYMASTER_ADDRESS,
-  PAYMENT_PROCESSOR_ADDRESS,
-  QRIS_REGISTRY_ADDRESS,
-  SIMPLE_ACCOUNT_FACTORY,
-} from "@/config/constants";
+import { useActiveChain } from "@/hooks/useActiveChain";
 import {
   ERC20_ABI,
   FAUCET_ABI,
@@ -67,9 +59,22 @@ export type BaseAppDeploymentStatus = {
 };
 
 export function useSmartAccount() {
+  const { config } = useActiveChain();
+  const chain = config.chain;
+  const chainKey = config.key;
+  const rpcUrl = config.rpcUrl;
+  const bundlerUrl = config.bundlerUrl;
+  const entryPointAddress = config.entryPointAddress;
+  const simpleAccountFactory = config.simpleAccountFactory;
+  const paymasterAddress = config.paymasterAddress;
+  const paymentProcessorAddress = config.paymentProcessorAddress;
+  const qrisRegistryAddress = config.qrisRegistryAddress;
+  const tokens = config.tokens;
+
   const PAYMASTER_VERIFICATION_GAS = BigInt(1_000_000);
   const PAYMASTER_POST_OP_GAS = BigInt(1_000_000);
-  const PRE_VERIFICATION_GAS = BigInt(150_000);
+  const PRE_VERIFICATION_GAS =
+    chain.id === 127823 ? BigInt(7_500_000) : BigInt(150_000);
   const { wallets, ready: privyReady } = useWallets();
   const { authenticated } = usePrivy();
   const { createWallet } = useCreateWallet();
@@ -93,18 +98,36 @@ export function useSmartAccount() {
   const [client, setClient] = useState<ReturnType<
     typeof createSmartAccountClient
   > | null>(null);
+  const prevChainRef = useRef<number | null>(null);
 
   const publicClient = useMemo(
     () =>
       createPublicClient({
-        chain: BASE_SEPOLIA,
-        transport: http(BASE_SEPOLIA.rpcUrls.default.http[0]),
+        chain,
+        transport: http(rpcUrl),
       }),
-    [],
+    [chain, rpcUrl],
   );
 
   // isReady = true when: not authenticated OR smartAccountAddress is set
   const isReady = !authenticated || !!smartAccountAddress;
+
+  // Reset chain-specific smart account state when chain changes
+  useEffect(() => {
+    if (prevChainRef.current === null) {
+      prevChainRef.current = chain.id;
+      return;
+    }
+    if (prevChainRef.current !== chain.id) {
+      prevChainRef.current = chain.id;
+      setSmartAccountAddress(null);
+      setClient(null);
+      setBaseAppDeployment(null);
+      setStatus("");
+      setError(null);
+      setIsBaseAccountWallet(false);
+    }
+  }, [chain.id, chainKey]);
 
   // Ensure an embedded Privy wallet exists for signing
   useEffect(() => {
@@ -167,7 +190,7 @@ export function useSmartAccount() {
         const createClientAny = createWalletClient as any;
         const privyWalletClient = createClientAny({
           account,
-          chain: BASE_SEPOLIA,
+          chain: chain,
           transport: custom(provider),
         });
         if (cancelled) return;
@@ -197,7 +220,7 @@ export function useSmartAccount() {
     return () => {
       cancelled = true;
     };
-  }, [wallets, privyReady, authenticated]);
+  }, [wallets, privyReady, authenticated, chain]);
 
   useEffect(() => {
     if (!effectiveWalletClient || !eoaAddress) {
@@ -220,11 +243,11 @@ export function useSmartAccount() {
         return;
       }
 
-      const rpcUrl = BASE_SEPOLIA.rpcUrls.default.http[0];
+      const rpcUrl = chain.rpcUrls.default.http[0];
       setBaseAppDeployment({
         status: "checking",
         address: eoaAddress,
-        chainId: BASE_SEPOLIA.id,
+        chainId: chain.id,
         rpcUrl,
       });
 
@@ -237,7 +260,7 @@ export function useSmartAccount() {
         setBaseAppDeployment({
           status: bytecode && bytecode !== "0x" ? "deployed" : "missing",
           address: eoaAddress,
-          chainId: BASE_SEPOLIA.id,
+          chainId: chain.id,
           rpcUrl,
           codeLength,
         });
@@ -246,7 +269,7 @@ export function useSmartAccount() {
         setBaseAppDeployment({
           status: "unknown",
           address: eoaAddress,
-          chainId: BASE_SEPOLIA.id,
+          chainId: chain.id,
           rpcUrl,
           error: err instanceof Error ? err.message : String(err),
         });
@@ -258,7 +281,7 @@ export function useSmartAccount() {
     return () => {
       cancelled = true;
     };
-  }, [isBaseAccountWallet, eoaAddress, publicClient]);
+  }, [isBaseAccountWallet, eoaAddress, publicClient, chain]);
 
   const wrapBaseAccountSignature = useCallback(
     (signature: `0x${string}`, ownerIndex: bigint = 0n) => {
@@ -304,7 +327,7 @@ export function useSmartAccount() {
         domain: {
           name: "Coinbase Smart Wallet",
           version: "1",
-          chainId: BASE_SEPOLIA.id,
+          chainId: chain.id,
           verifyingContract: eoaAddress,
         },
         types: {
@@ -584,20 +607,20 @@ export function useSmartAccount() {
         if (!owner) return;
         const simpleAccount = await toSimpleSmartAccount({
           client: createPublicClient({
-            chain: BASE_SEPOLIA,
-            transport: http(BASE_SEPOLIA.rpcUrls.default.http[0]),
+            chain: chain,
+            transport: http(chain.rpcUrls.default.http[0]),
           }),
           owner,
-          entryPoint: { address: ENTRY_POINT_ADDRESS, version: "0.7" as const },
-          factoryAddress: SIMPLE_ACCOUNT_FACTORY,
+          entryPoint: { address: entryPointAddress, version: "0.7" as const },
+          factoryAddress: simpleAccountFactory,
         });
 
         if (cancelled) return;
 
         const smartAccountClient = createSmartAccountClient({
           account: simpleAccount,
-          chain: BASE_SEPOLIA,
-          bundlerTransport: http(PIMLICO_BUNDLER_URL),
+          chain: chain,
+          bundlerTransport: http(bundlerUrl),
         });
 
         setSmartAccountAddress(simpleAccount.address);
@@ -627,10 +650,10 @@ export function useSmartAccount() {
   const bundlerClient = useMemo(
     () =>
       createPublicClient({
-        chain: BASE_SEPOLIA,
-        transport: http(PIMLICO_BUNDLER_URL),
+        chain: chain,
+        transport: http(bundlerUrl),
       }),
-    [],
+    [chain, bundlerUrl],
   );
 
   const getFeeParams = useCallback(async () => {
@@ -640,20 +663,47 @@ export function useSmartAccount() {
       return bumped > value ? bumped : value + 1n;
     };
 
+    const MIN_PRIORITY_FEE = 6_000_000n; // 0.006 gwei fallback (bundler requirement)
+    const normalizePriorityFee = (value: bigint) =>
+      value < MIN_PRIORITY_FEE ? MIN_PRIORITY_FEE : value;
+
+    const normalizeFees = (maxFeePerGas: bigint, maxPriorityFeePerGas: bigint) => {
+      let maxFee = addBuffer(maxFeePerGas);
+      let maxPriority = addBuffer(maxPriorityFeePerGas);
+      maxPriority = normalizePriorityFee(maxPriority);
+      if (maxFee < maxPriority) {
+        maxFee = maxPriority;
+      }
+      return { maxFeePerGas: maxFee, maxPriorityFeePerGas: maxPriority };
+    };
+
+    try {
+      const bundlerFees = await bundlerClient.request({
+        method: "pimlico_getUserOperationGasPrice",
+        params: [],
+      });
+      const tier =
+        (bundlerFees as any)?.fast ||
+        (bundlerFees as any)?.standard ||
+        (bundlerFees as any)?.slow;
+      if (tier?.maxFeePerGas && tier?.maxPriorityFeePerGas) {
+        return normalizeFees(
+          BigInt(tier.maxFeePerGas),
+          BigInt(tier.maxPriorityFeePerGas),
+        );
+      }
+    } catch {
+      // fallback to publicClient below
+    }
+
     try {
       const fees = await publicClient.estimateFeesPerGas();
-      return {
-        maxFeePerGas: addBuffer(fees.maxFeePerGas),
-        maxPriorityFeePerGas: addBuffer(fees.maxPriorityFeePerGas),
-      };
+      return normalizeFees(fees.maxFeePerGas, fees.maxPriorityFeePerGas);
     } catch {
       const gasPrice = await publicClient.getGasPrice();
-      return {
-        maxFeePerGas: addBuffer(gasPrice),
-        maxPriorityFeePerGas: addBuffer(gasPrice),
-      };
+      return normalizeFees(gasPrice, gasPrice);
     }
-  }, [publicClient]);
+  }, [publicClient, bundlerClient]);
 
   const estimatePaymasterCost = useCallback(
     async (
@@ -663,7 +713,7 @@ export function useSmartAccount() {
     ): Promise<bigint> => {
       try {
         const cost = await publicClient.readContract({
-          address: PAYMASTER_ADDRESS,
+          address: paymasterAddress,
           abi: PAYMASTER_ABI,
           functionName: "estimateTotalCost",
           args: [token, gasLimit, maxFeePerGas],
@@ -674,7 +724,7 @@ export function useSmartAccount() {
         return 0n;
       }
     },
-    [publicClient],
+    [publicClient, paymasterAddress],
   );
 
   const assertPaymasterBalance = useCallback(
@@ -688,7 +738,7 @@ export function useSmartAccount() {
     }) => {
       const [supported, balance, allowance, gasCost] = await Promise.all([
         publicClient.readContract({
-          address: PAYMASTER_ADDRESS,
+          address: paymasterAddress,
           abi: PAYMASTER_ABI,
           functionName: "isSupportedToken",
           args: [params.token],
@@ -703,7 +753,7 @@ export function useSmartAccount() {
           address: params.token,
           abi: ERC20_ABI,
           functionName: "allowance",
-          args: [params.owner, PAYMASTER_ADDRESS],
+          args: [params.owner, paymasterAddress],
         }) as Promise<bigint>,
         estimatePaymasterCost(
           params.token,
@@ -739,7 +789,7 @@ export function useSmartAccount() {
         );
       }
     },
-    [estimatePaymasterCost, publicClient],
+    [estimatePaymasterCost, publicClient, paymasterAddress],
   );
 
   const waitForUserOp = useCallback(
@@ -813,14 +863,14 @@ export function useSmartAccount() {
     const simpleAccount = await toSimpleSmartAccount({
       client: publicClient,
       owner,
-      entryPoint: { address: ENTRY_POINT_ADDRESS, version: "0.7" as const },
-      factoryAddress: SIMPLE_ACCOUNT_FACTORY,
+      entryPoint: { address: entryPointAddress, version: "0.7" as const },
+      factoryAddress: simpleAccountFactory,
     });
 
     const smartAccountClient = createSmartAccountClient({
       account: simpleAccount,
-      chain: BASE_SEPOLIA,
-      bundlerTransport: http(PIMLICO_BUNDLER_URL),
+      chain: chain,
+      bundlerTransport: http(bundlerUrl),
     });
 
     setSmartAccountAddress(simpleAccount.address);
@@ -832,6 +882,10 @@ export function useSmartAccount() {
     getSmartAccountOwner,
     eoaAddress,
     publicClient,
+    entryPointAddress,
+    simpleAccountFactory,
+    chain,
+    bundlerUrl,
   ]);
 
   const approvePaymaster = useCallback(
@@ -869,7 +923,7 @@ export function useSmartAccount() {
           const approveData = encodeFunctionData({
             abi: ERC20_ABI,
             functionName: "approve",
-            args: [PAYMASTER_ADDRESS, maxUint256],
+            args: [paymasterAddress, maxUint256],
           });
           return { to: token, data: approveData, value: BigInt(0) };
         });
@@ -881,11 +935,11 @@ export function useSmartAccount() {
           baseCallGas + tokenAddresses.length * perApproveGas,
         );
         const verificationGasLimit = BigInt(1_500_000);
-        const preVerificationGas = BigInt(150_000);
+        const preVerificationGas = PRE_VERIFICATION_GAS;
 
         const res = await client.sendCalls({
           calls,
-          paymaster: PAYMASTER_ADDRESS,
+          paymaster: paymasterAddress,
           paymasterData,
           paymasterVerificationGasLimit: BigInt(250_000),
           paymasterPostOpGasLimit: BigInt(200_000),
@@ -960,7 +1014,7 @@ export function useSmartAccount() {
               value: BigInt(0),
             },
           ],
-          paymaster: PAYMASTER_ADDRESS,
+          paymaster: paymasterAddress,
           paymasterData,
           paymasterVerificationGasLimit: BigInt(200_000),
           paymasterPostOpGasLimit: BigInt(200_000),
@@ -1058,12 +1112,12 @@ export function useSmartAccount() {
         const res = await client.sendCalls({
           calls: [
             {
-              to: QRIS_REGISTRY_ADDRESS,
+              to: qrisRegistryAddress,
               data: registerData,
               value: BigInt(0),
             },
           ],
-          paymaster: PAYMASTER_ADDRESS,
+          paymaster: paymasterAddress,
           paymasterData,
           paymasterVerificationGasLimit: PAYMASTER_VERIFICATION_GAS,
           paymasterPostOpGasLimit: PAYMASTER_POST_OP_GAS,
@@ -1148,12 +1202,12 @@ export function useSmartAccount() {
         const res = await client.sendCalls({
           calls: [
             {
-              to: QRIS_REGISTRY_ADDRESS,
+              to: qrisRegistryAddress,
               data: removeData,
               value: BigInt(0),
             },
           ],
-          paymaster: PAYMASTER_ADDRESS,
+          paymaster: paymasterAddress,
           paymasterData,
           paymasterVerificationGasLimit: PAYMASTER_VERIFICATION_GAS,
           paymasterPostOpGasLimit: PAYMASTER_POST_OP_GAS,
@@ -1248,7 +1302,7 @@ export function useSmartAccount() {
                 value: BigInt(0),
               },
             ],
-            paymaster: PAYMASTER_ADDRESS,
+            paymaster: paymasterAddress,
             paymasterData,
             paymasterVerificationGasLimit: PAYMASTER_VERIFICATION_GAS,
             paymasterPostOpGasLimit: PAYMASTER_POST_OP_GAS,
@@ -1262,7 +1316,7 @@ export function useSmartAccount() {
           const msg = err instanceof Error ? err.message : "send failed";
           if (msg.includes("Failed to fetch")) {
             throw new Error(
-              `Bundler RPC unreachable at ${PIMLICO_BUNDLER_URL} (${msg})`,
+              `Bundler RPC unreachable at ${bundlerUrl} (${msg})`,
             );
           }
           throw err;
@@ -1373,7 +1427,7 @@ export function useSmartAccount() {
         try {
           const res = await client.sendCalls({
             calls,
-            paymaster: PAYMASTER_ADDRESS,
+            paymaster: paymasterAddress,
             paymasterData,
             paymasterVerificationGasLimit: PAYMASTER_VERIFICATION_GAS,
             paymasterPostOpGasLimit: PAYMASTER_POST_OP_GAS,
@@ -1387,7 +1441,7 @@ export function useSmartAccount() {
           const msg = err instanceof Error ? err.message : "send failed";
           if (msg.includes("Failed to fetch")) {
             throw new Error(
-              `Bundler RPC unreachable at ${PIMLICO_BUNDLER_URL} (${msg})`,
+              `Bundler RPC unreachable at ${bundlerUrl} (${msg})`,
             );
           }
           throw err;
@@ -1502,7 +1556,7 @@ export function useSmartAccount() {
         setStatus("Submitting swap UserOperation...");
         const res = await client.sendCalls({
           calls,
-          paymaster: PAYMASTER_ADDRESS,
+          paymaster: paymasterAddress,
           paymasterData,
           paymasterVerificationGasLimit: PAYMASTER_VERIFICATION_GAS,
           paymasterPostOpGasLimit: PAYMASTER_POST_OP_GAS,
@@ -1642,7 +1696,7 @@ export function useSmartAccount() {
         setStatus("Submitting swap & transfer UserOperation...");
         const res = await client.sendCalls({
           calls,
-          paymaster: PAYMASTER_ADDRESS,
+          paymaster: paymasterAddress,
           paymasterData,
           paymasterVerificationGasLimit: PAYMASTER_VERIFICATION_GAS,
           paymasterPostOpGasLimit: PAYMASTER_POST_OP_GAS,
@@ -1794,7 +1848,7 @@ export function useSmartAccount() {
         );
         const res = await client.sendCalls({
           calls,
-          paymaster: PAYMASTER_ADDRESS,
+          paymaster: paymasterAddress,
           paymasterData,
           paymasterVerificationGasLimit: PAYMASTER_VERIFICATION_GAS,
           paymasterPostOpGasLimit: PAYMASTER_POST_OP_GAS,
@@ -1877,7 +1931,7 @@ export function useSmartAccount() {
         });
 
         const processor =
-          params.paymentProcessorAddress || PAYMENT_PROCESSOR_ADDRESS;
+          params.paymentProcessorAddress || paymentProcessorAddress;
         const calls = [];
 
         if (needsApproval) {
@@ -1917,7 +1971,7 @@ export function useSmartAccount() {
         setStatus("Submitting payment UserOperation...");
         const res = await client.sendCalls({
           calls,
-          paymaster: PAYMASTER_ADDRESS,
+          paymaster: paymasterAddress,
           paymasterData,
           paymasterVerificationGasLimit: BigInt(260_000),
           paymasterPostOpGasLimit: BigInt(260_000),
@@ -1996,7 +2050,7 @@ export function useSmartAccount() {
         });
 
         const processor =
-          params.paymentProcessorAddress || PAYMENT_PROCESSOR_ADDRESS;
+          params.paymentProcessorAddress || paymentProcessorAddress;
         const calls: { to: Address; data: `0x${string}`; value: bigint }[] = [];
 
         // Build approve calls for each unique token
@@ -2044,7 +2098,7 @@ export function useSmartAccount() {
         setStatus("Submitting multi-token payment UserOperation...");
         const res = await client.sendCalls({
           calls,
-          paymaster: PAYMASTER_ADDRESS,
+          paymaster: paymasterAddress,
           paymasterData,
           paymasterVerificationGasLimit: BigInt(300_000),
           paymasterPostOpGasLimit: BigInt(300_000),
@@ -2176,7 +2230,7 @@ export function useSmartAccount() {
         setStatus("Submitting QRIS multi-token payment...");
         const res = await client.sendCalls({
           calls,
-          paymaster: PAYMASTER_ADDRESS,
+          paymaster: paymasterAddress,
           paymasterData,
           paymasterVerificationGasLimit: BigInt(300_000),
           paymasterPostOpGasLimit: BigInt(300_000),
@@ -2228,7 +2282,7 @@ export function useSmartAccount() {
     }
 
     setIsLoading(true);
-    setStatus("Deploying Base App Smart Account...");
+    setStatus("Deploying Smart Account...");
     setError(null);
 
     try {
@@ -2241,24 +2295,24 @@ export function useSmartAccount() {
         setBaseAppDeployment({
           status: "deployed",
           address: eoaAddress as Address,
-          chainId: BASE_SEPOLIA.id,
-          rpcUrl: BASE_SEPOLIA.rpcUrls.default.http[0],
+          chainId: chain.id,
+          rpcUrl: chain.rpcUrls.default.http[0],
           codeLength,
         });
-        setStatus("Base App already deployed!");
+        setStatus("Smart Account already deployed!");
         return { alreadyDeployed: true };
       }
 
-      setStatus("Switching to Base Sepolia...");
+      setStatus(`Switching to ${chain.name}...`);
 
       // Switch chain first
       try {
-        await effectiveWalletClient.switchChain({ id: BASE_SEPOLIA.id });
+        await effectiveWalletClient.switchChain({ id: chain.id });
       } catch (switchError) {
         // If switch fails, try adding the chain first
         try {
-          await effectiveWalletClient.addChain({ chain: BASE_SEPOLIA });
-          await effectiveWalletClient.switchChain({ id: BASE_SEPOLIA.id });
+          await effectiveWalletClient.addChain({ chain: chain });
+          await effectiveWalletClient.switchChain({ id: chain.id });
         } catch {
           // Ignore if chain already exists
         }
@@ -2266,11 +2320,11 @@ export function useSmartAccount() {
 
       setStatus("Sending self-transaction to trigger deployment...");
 
-      // Send 0 ETH to self - this triggers Base App lazy deployment
+      // Send 0 ETH to self - this triggers smart account lazy deployment
       const txHash = await effectiveWalletClient.sendTransaction({
         to: eoaAddress,
         value: BigInt(0),
-        chain: BASE_SEPOLIA,
+        chain: chain,
       } as any);
 
       setStatus("Waiting for deployment confirmation...");
@@ -2313,11 +2367,11 @@ export function useSmartAccount() {
         setBaseAppDeployment({
           status: "deployed",
           address: eoaAddress as Address,
-          chainId: BASE_SEPOLIA.id,
-          rpcUrl: BASE_SEPOLIA.rpcUrls.default.http[0],
+          chainId: chain.id,
+          rpcUrl: chain.rpcUrls.default.http[0],
           codeLength,
         });
-        setStatus("Base App deployed successfully!");
+        setStatus("Smart Account deployed successfully!");
         return { success: true, txHash };
       } else {
         // Transaction succeeded but no bytecode - might be EOA not Smart Account
@@ -2328,8 +2382,8 @@ export function useSmartAccount() {
         setBaseAppDeployment({
           status: "deployed",
           address: eoaAddress as Address,
-          chainId: BASE_SEPOLIA.id,
-          rpcUrl: BASE_SEPOLIA.rpcUrls.default.http[0],
+          chainId: chain.id,
+          rpcUrl: chain.rpcUrls.default.http[0],
           codeLength: 0,
         });
         setStatus("Wallet deployed (transaction confirmed)!");
@@ -2343,7 +2397,7 @@ export function useSmartAccount() {
     } finally {
       setIsLoading(false);
     }
-  }, [eoaAddress, effectiveWalletClient, publicClient]);
+  }, [eoaAddress, effectiveWalletClient, publicClient, chain]);
 
   return {
     smartAccountAddress,
@@ -2371,3 +2425,4 @@ export function useSmartAccount() {
     deployBaseAccount,
   };
 }
+

@@ -6,19 +6,7 @@ import {
   formatUnits,
   type Address,
 } from "viem";
-import { BASE_SEPOLIA } from "@/config/chains";
-import {
-  PAYMENT_PROCESSOR_ADDRESS,
-  PAYMASTER_ADDRESS,
-  STABLE_SWAP_ADDRESS,
-  TOKENS,
-} from "@/config/constants";
-import { env } from "@/config/env";
-
-const publicClient = createPublicClient({
-  chain: BASE_SEPOLIA,
-  transport: http(BASE_SEPOLIA.rpcUrls.default.http[0]),
-});
+import type { ChainRuntimeConfig, TokenConfig } from "@/config/chains";
 
 const transferEventAbi = parseAbiItem(
   "event Transfer(address indexed from, address indexed to, uint256 value)"
@@ -28,17 +16,14 @@ const paymentCompletedEventAbi = parseAbiItem(
   "event PaymentCompleted(bytes32 indexed nonce, address indexed recipient, address indexed payer, address requestedToken, address payToken, uint256 requestedAmount, uint256 paidAmount)"
 );
 
-const tokenInfoMap = new Map(
-  TOKENS.map((token) => [token.address.toLowerCase(), token])
-);
-
 const MAX_ACTIVITIES = 10;
 const MAX_BLOCK_RANGE = 20000n;
 const MIN_BLOCK_RANGE = 2000n;
-const MAX_LOOKBACK_BLOCKS = BigInt(env.activityLookbackBlocks);
 const MAX_CHUNKS = 20;
+const BLOCKSCOUT_LIMIT = 25;
 
-type LogWithArgs = Awaited<ReturnType<typeof publicClient.getLogs>>[number] & {
+type PublicClient = ReturnType<typeof createPublicClient>;
+type LogWithArgs = Awaited<ReturnType<PublicClient["getLogs"]>>[number] & {
   args?: Record<string, unknown> | readonly unknown[];
 };
 
@@ -46,7 +31,7 @@ type TransferLog = LogWithArgs;
 
 type TokenTransferLog = {
   log: TransferLog;
-  token: (typeof TOKENS)[number];
+  token: TokenConfig;
   direction: "send" | "receive";
 };
 
@@ -55,13 +40,14 @@ type PaymentLog = {
   role: "payer" | "recipient";
 };
 
-type GetLogsParams = Parameters<typeof publicClient.getLogs>[0];
+type GetLogsParams = Parameters<PublicClient["getLogs"]>[0];
 
 const getLogsSafe = async (
+  publicClient: PublicClient,
   params: Omit<GetLogsParams, "fromBlock" | "toBlock">,
   fromBlock: bigint,
   toBlock: bigint
-): Promise<Awaited<ReturnType<typeof publicClient.getLogs>>> => {
+): Promise<Awaited<ReturnType<PublicClient["getLogs"]>>> => {
   try {
     return await publicClient.getLogs({ ...params, fromBlock, toBlock } as any);
   } catch (err) {
@@ -79,8 +65,8 @@ const getLogsSafe = async (
     }
     const mid = fromBlock + range / 2n;
     const [left, right] = await Promise.all([
-      getLogsSafe(params, fromBlock, mid),
-      getLogsSafe(params, mid + 1n, toBlock),
+      getLogsSafe(publicClient, params, fromBlock, mid),
+      getLogsSafe(publicClient, params, mid + 1n, toBlock),
     ]);
     return [...left, ...right];
   }
@@ -120,20 +106,114 @@ const getPaymentArgs = (
   };
 };
 
+const normalizeExplorerApiUrl = (url: string) =>
+  `${url.replace(/\/$/, "")}/api`;
+
+const fetchBlockscoutTokenTransfers = async (
+  walletAddress: string,
+  config: ChainRuntimeConfig
+): Promise<ActivityData[]> => {
+  if (!config.blockExplorer?.url) return [];
+  const apiUrl = normalizeExplorerApiUrl(config.blockExplorer.url);
+  const address = walletAddress.toLowerCase();
+  const tokenMap = new Map(
+    config.tokens.map((token) => [token.address.toLowerCase(), token])
+  );
+  const excludedAddresses = new Set(
+    [
+      config.paymasterAddress,
+      config.stableSwapAddress,
+      config.paymentProcessorAddress,
+    ].map((addr) => addr.toLowerCase())
+  );
+
+  const url = `${apiUrl}?module=account&action=tokentx&address=${address}&page=1&offset=${BLOCKSCOUT_LIMIT}&sort=desc`;
+
+  try {
+    const res = await fetch(url);
+    if (!res.ok) {
+      console.warn("Blockscout tokentx failed:", res.status, res.statusText);
+      return [];
+    }
+    const data = await res.json();
+    if (!data || !Array.isArray(data.result)) {
+      return [];
+    }
+
+    const activities: ActivityData[] = [];
+
+    for (const tx of data.result) {
+      const contractAddress = String(tx.contractAddress || tx.tokenAddress || "")
+        .toLowerCase();
+      const token = tokenMap.get(contractAddress);
+      if (!token) continue;
+
+      const from = String(tx.from || "").toLowerCase();
+      const to = String(tx.to || "").toLowerCase();
+      const direction =
+        from === address ? "send" : to === address ? "receive" : null;
+      if (!direction) continue;
+      const counterparty = direction === "send" ? to : from;
+      if (excludedAddresses.has(counterparty)) {
+        continue;
+      }
+
+      const valueRaw = tx.value ? BigInt(tx.value) : 0n;
+      const amount = parseFloat(formatUnits(valueRaw, token.decimals));
+      const timestamp = new Date(Number(tx.timeStamp || 0) * 1000);
+      const txHash = tx.hash || tx.transactionHash;
+      const id = `${txHash}-${contractAddress}-${direction}`;
+
+      activities.push({
+        id,
+        type: direction,
+        status: "confirmed",
+        timestamp,
+        amount,
+        currency: token.symbol,
+        currencyIcon: token.icon,
+        txHash,
+        fromAddress: tx.from,
+        toAddress: tx.to,
+      });
+
+      if (activities.length >= MAX_ACTIVITIES) break;
+    }
+
+    return activities;
+  } catch (err) {
+    console.warn("Blockscout tokentx fetch error:", err);
+    return [];
+  }
+};
+
 /**
  * Fetch activity history from blockchain
  */
 export async function fetchActivityHistory(
-  walletAddress: string
+  walletAddress: string,
+  config: ChainRuntimeConfig
 ): Promise<ActivityData[]> {
   if (!walletAddress || walletAddress === "0x1234...5678") {
     return [];
   }
 
+  const publicClient = createPublicClient({
+    chain: config.chain,
+    transport: http(config.rpcUrl),
+  });
+
+  const tokens = config.tokens;
+  const tokenInfoMap = new Map(
+    tokens.map((token) => [token.address.toLowerCase(), token])
+  );
+  const MAX_LOOKBACK_BLOCKS = BigInt(config.activityLookbackBlocks);
+
   const address = walletAddress.toLowerCase() as Address;
-  const stableSwapAddress = STABLE_SWAP_ADDRESS.toLowerCase();
-  const paymentProcessorAddress = PAYMENT_PROCESSOR_ADDRESS.toLowerCase();
-  const paymasterAddress = PAYMASTER_ADDRESS.toLowerCase();
+  const stableSwapAddress = config.stableSwapAddress.toLowerCase();
+  const paymentProcessorAddress =
+    config.paymentProcessorAddress.toLowerCase();
+  const paymasterAddress = config.paymasterAddress.toLowerCase();
 
   const activities: ActivityData[] = [];
   const blockTimestampCache = new Map<bigint, Date>();
@@ -343,9 +423,10 @@ export async function fetchActivityHistory(
 
       const [sentByToken, receivedByToken] = await Promise.all([
         Promise.all(
-          TOKENS.map(async (token) => {
+          tokens.map(async (token) => {
             try {
               const logs = await getLogsSafe(
+                publicClient,
                 {
                   address: token.address as Address,
                   event: transferEventAbi,
@@ -369,9 +450,10 @@ export async function fetchActivityHistory(
           })
         ),
         Promise.all(
-          TOKENS.map(async (token) => {
+          tokens.map(async (token) => {
             try {
               const logs = await getLogsSafe(
+                publicClient,
                 {
                   address: token.address as Address,
                   event: transferEventAbi,
@@ -400,8 +482,9 @@ export async function fetchActivityHistory(
 
       const [paymentByPayer, paymentByRecipient] = await Promise.all([
         getLogsSafe(
+          publicClient,
           {
-            address: PAYMENT_PROCESSOR_ADDRESS as Address,
+            address: config.paymentProcessorAddress as Address,
             event: paymentCompletedEventAbi,
             args: { payer: address },
           },
@@ -414,8 +497,9 @@ export async function fetchActivityHistory(
             return [];
           }),
         getLogsSafe(
+          publicClient,
           {
-            address: PAYMENT_PROCESSOR_ADDRESS as Address,
+            address: config.paymentProcessorAddress as Address,
             event: paymentCompletedEventAbi,
             args: { recipient: address },
           },
@@ -445,9 +529,20 @@ export async function fetchActivityHistory(
       chunkCount += 1;
     }
 
-    return activities.slice(0, MAX_ACTIVITIES);
+    const trimmed = activities.slice(0, MAX_ACTIVITIES);
+    if (trimmed.length === 0 && config.key === "etherlink_shadownet") {
+      const fallback = await fetchBlockscoutTokenTransfers(
+        walletAddress,
+        config
+      );
+      return fallback;
+    }
+    return trimmed;
   } catch (err) {
     console.error("Failed to fetch activity history:", err);
+    if (config.key === "etherlink_shadownet") {
+      return await fetchBlockscoutTokenTransfers(walletAddress, config);
+    }
     return [];
   }
 }

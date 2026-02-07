@@ -1,10 +1,11 @@
 "use client";
 
-import { useRef, useEffect, useState } from "react";
+import { useRef, useEffect, useState, useMemo } from "react";
 import { QRCodeSVG } from "qrcode.react";
 import { Download, Share2, Copy, Check } from "lucide-react";
-import { currencies } from "@/components/Currency";
+import { buildCurrencies } from "@/components/Currency";
 import { formatUnits } from "viem";
+import { useActiveChain } from "@/hooks/useActiveChain";
 
 interface PaymentRequestPayload {
   version: string;
@@ -30,6 +31,8 @@ export default function GeneratedQRCode({
   data,
   onBack,
 }: GeneratedQRCodeProps) {
+  const { config } = useActiveChain();
+  const currencies = useMemo(() => buildCurrencies(config), [config]);
   const qrRef = useRef<HTMLDivElement>(null);
   const qrValue = JSON.stringify(data);
   const [remainingSeconds, setRemainingSeconds] = useState(0);

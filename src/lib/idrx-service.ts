@@ -1,4 +1,5 @@
 import { createSignature, generateTimestamp } from "./idrx-signature";
+import { idrxEnv } from "@/config/env.server";
 
 interface MintRequestPayload extends Record<string, unknown> {
   toBeMinted: string;
@@ -84,12 +85,29 @@ export class IDRXService {
   private secretKey: string;
   private baseUrl: string;
   private networkChainId: string;
+  private networkChainIdEtherlink: string;
 
   constructor() {
-    this.apiKey = process.env.IDRX_API_KEY!;
-    this.secretKey = process.env.IDRX_SECRET_KEY!;
-    this.baseUrl = process.env.IDRX_BASE_URL!;
-    this.networkChainId = process.env.IDRX_NETWORK_CHAIN_ID!;
+    this.apiKey = idrxEnv.apiKey;
+    this.secretKey = idrxEnv.secretKey;
+    this.baseUrl = idrxEnv.baseUrl;
+    this.networkChainId = idrxEnv.networkChainId;
+    this.networkChainIdEtherlink = idrxEnv.networkChainIdEtherlink;
+  }
+
+  private resolveNetworkChainId(chain?: string): string {
+    if (!chain) return this.networkChainId;
+    const raw = chain.toLowerCase();
+    if (
+      raw === "etherlink" ||
+      raw === "etherlink_shadownet" ||
+      raw === "shadownet" ||
+      raw === "127823" ||
+      raw === "42793"
+    ) {
+      return this.networkChainIdEtherlink;
+    }
+    return this.networkChainId;
   }
 
   async createMintRequest(
@@ -98,16 +116,18 @@ export class IDRXService {
     expiryPeriodHours: number = 24,
     requestType: "idrx" | "usdc" | "usdt" = "idrx",
     productDetails?: string,
+    chain?: string,
   ): Promise<MintRequestResponse> {
     const method = "POST";
     const url = "/transaction/mint-request";
     const timestamp = generateTimestamp();
+    const networkChainId = this.resolveNetworkChainId(chain);
 
     const payload: MintRequestPayload = {
       toBeMinted: amount,
       destinationWalletAddress,
       expiryPeriod: expiryPeriodHours,
-      networkChainId: this.networkChainId,
+      networkChainId,
       requestType,
       ...(productDetails ? { productDetails } : {}),
     };
