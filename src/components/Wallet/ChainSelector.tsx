@@ -40,7 +40,7 @@ export default function ChainSelector() {
       <button
         type="button"
         onClick={() => setIsOpen((prev) => !prev)}
-        className="flex items-center gap-2 px-3 py-2 bg-zinc-800 rounded-xl text-zinc-200 text-xs sm:text-sm border border-zinc-700 hover:border-zinc-600 transition-colors"
+        className="flex items-center gap-2 px-3 py-2 bg-zinc-800 rounded-xl text-zinc-200 text-xs sm:text-sm border border-zinc-700 hover:border-zinc-600 transition-colors max-w-[180px] sm:max-w-none"
       >
         <Image
           src={getChainIcon(chainKey)}
@@ -49,8 +49,12 @@ export default function ChainSelector() {
           height={16}
           className="rounded-full"
         />
-        <span className="font-semibold">{current.chain.name}</span>
-        <span className="text-zinc-400">({current.nativeCurrency.symbol})</span>
+        <div className="flex items-center gap-1 min-w-0">
+          <span className="font-semibold truncate">{current.chain.name}</span>
+          <span className="text-zinc-400 shrink-0">
+            ({current.nativeCurrency.symbol})
+          </span>
+        </div>
         <ChevronDown
           className={`w-4 h-4 text-zinc-400 transition-transform ${isOpen ? "rotate-180" : ""}`}
         />

@@ -109,13 +109,13 @@ export default function Start() {
     <div className="min-h-screen bg-black-secondary p-4 sm:p-8">
       <div className="max-w-2xl mx-auto space-y-6">
         {/* Header with Logo and Wallet */}
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
           {/* Logo - bigger */}
-          <img src="/logo.svg" alt="ArtaPay" className="h-10 sm:h-12" />
+          <img src="/logo.svg" alt="ArtaPay" className="h-10 sm:h-12 shrink-0" />
 
           {/* Wallet Info - Address + Balance */}
-          <div className="flex flex-col items-end gap-2">
-            <div className="flex items-center gap-2">
+          <div className="flex flex-col items-end gap-2 w-full sm:w-auto self-end">
+            <div className="flex items-center gap-2 flex-wrap justify-end w-full sm:w-auto">
               <ChainSelector />
               <WalletButton />
             </div>

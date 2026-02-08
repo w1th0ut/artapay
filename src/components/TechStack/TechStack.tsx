@@ -12,8 +12,8 @@ const techStack: TechItem[] = [
     { name: 'Etherlink', icon: '/icons/Etherlink.svg' },
     { name: 'Pimlico', icon: '/icons/pimlico.svg' },
     { name: 'Base', icon: '/icons/Base.svg' },
-    { name: 'Wagmi', icon: '/icons/Wagmi.svg' },
-    { name: 'Foundry', icon: '/icons/Foundry.svg' },
+    { name: 'IDRX API', icon: '/icons/IDRX-2.svg' },
+    { name: 'QRIS', icon: '/icons/QRIS.svg' },
     { name: 'Privy', icon: '/icons/Privy.svg' },
 ];
 

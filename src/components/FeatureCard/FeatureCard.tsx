@@ -27,7 +27,7 @@ const features = [
     },
     {
         title: "Gasless Transactions",
-        description: "Pay gas fees directly with stablecoins. No ETH required.",
+        description: "Pay gas fees directly with stablecoins. No ETH or XTZ required.",
         imageDefault: gaslessDefault.src,
         imageHover: gaslessHover.src,
     },
